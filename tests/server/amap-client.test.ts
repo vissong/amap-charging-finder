@@ -3,6 +3,23 @@ import { describe, expect, it } from "vitest";
 import { createAmapClient } from "../../server/amap-client";
 import { fullAmapPoiResponse } from "../fixtures/amap";
 
+function poiPage(pageNumber: number, count: number) {
+  return {
+    status: "1",
+    info: "OK",
+    infocode: "10000",
+    count: String(count),
+    pois: Array.from({ length: count }, (_, index) => ({
+      id: `page-${pageNumber}-poi-${index}`,
+      name: `第 ${pageNumber} 页充电站 ${index}`,
+      location: `116.4${pageNumber},39.9${index}`,
+      distance: String(pageNumber * 1_000 + index),
+      type: "汽车服务;充电站;充电站",
+      typecode: "011100",
+    })),
+  };
+}
+
 describe("AMap HTTP client", () => {
   it("sends the exact charging station query without rounding beyond six decimals", async () => {
     let requestedUrl = "";
@@ -60,6 +77,65 @@ describe("AMap HTTP client", () => {
     });
 
     expect(new URL(requestedUrl).searchParams.get("types")).toBe("180300");
+  });
+
+  it("collects up to 200 nearby stations across eight pages", async () => {
+    const requestedPages: number[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      const pageNumber = Number(
+        new URL(String(input)).searchParams.get("page_num"),
+      );
+      requestedPages.push(pageNumber);
+      return new Response(
+        JSON.stringify({
+          ...poiPage(pageNumber, 25),
+          count: "200",
+        }),
+        { status: 200 },
+      );
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+    });
+
+    const response = (await client.searchChargingStations({
+      lng: 116.4,
+      lat: 39.9,
+      radius: 10_000,
+    })) as { pois: unknown[]; truncated: boolean };
+
+    expect(requestedPages).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(response.pois).toHaveLength(200);
+    expect(response.truncated).toBe(true);
+  });
+
+  it("stops nearby pagination after the first short page", async () => {
+    const requestedPages: number[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      const pageNumber = Number(
+        new URL(String(input)).searchParams.get("page_num"),
+      );
+      requestedPages.push(pageNumber);
+      const count = pageNumber === 1 ? 25 : 2;
+      return new Response(
+        JSON.stringify(poiPage(pageNumber, count)),
+        { status: 200 },
+      );
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+    });
+
+    const response = (await client.searchChargingStations({
+      lng: 116.4,
+      lat: 39.9,
+      radius: 3_000,
+    })) as { pois: unknown[] };
+
+    expect(requestedPages).toEqual([1, 2]);
+    expect(response.pois).toHaveLength(27);
   });
 
   it("searches charging stations nationwide with a qualified keyword", async () => {

@@ -89,9 +89,10 @@ export function createAmapClient({
     return payload;
   }
 
-  function searchNearby(
+  function searchNearbyPage(
     query: NearbySearchQuery,
     typecode: "011100" | "180300",
+    pageNumber: number,
   ): Promise<unknown> {
     return request("/v5/place/around", {
       location: location(query),
@@ -100,14 +101,50 @@ export function createAmapClient({
       sortrule: "distance",
       show_fields: "business,navi,children",
       page_size: "25",
-      page_num: "1",
+      page_num: String(pageNumber),
       output: "json",
     });
   }
 
+  async function searchNearbyPages(
+    query: NearbySearchQuery,
+    typecode: "011100" | "180300",
+    maximumPages: number,
+  ): Promise<unknown> {
+    let firstPayload: Record<string, unknown> | null = null;
+    const pois: unknown[] = [];
+
+    for (let pageNumber = 1; pageNumber <= maximumPages; pageNumber += 1) {
+      const payload = await searchNearbyPage(query, typecode, pageNumber);
+      const source =
+        payload !== null && typeof payload === "object"
+          ? (payload as Record<string, unknown>)
+          : {};
+      const pagePois = Array.isArray(source.pois) ? source.pois : [];
+
+      firstPayload ??= source;
+      pois.push(...pagePois);
+
+      if (pagePois.length < 25) {
+        break;
+      }
+    }
+
+    const reportedCount = Number(firstPayload?.count);
+    const truncated =
+      pois.length === maximumPages * 25 ||
+      (Number.isFinite(reportedCount) && reportedCount > pois.length);
+
+    return {
+      ...(firstPayload ?? {}),
+      pois,
+      truncated,
+    };
+  }
+
   return {
     searchChargingStations(query) {
-      return searchNearby(query, "011100");
+      return searchNearbyPages(query, "011100", 8);
     },
     searchChargingStationsByKeyword(keywords) {
       return request("/v5/place/text", {
@@ -120,7 +157,7 @@ export function createAmapClient({
       });
     },
     searchServiceAreas(query) {
-      return searchNearby(query, "180300");
+      return searchNearbyPages(query, "180300", 1);
     },
     reverseGeocode(query) {
       return request("/v3/geocode/regeo", {

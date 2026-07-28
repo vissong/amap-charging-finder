@@ -56,11 +56,28 @@ describe("API routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.count).toBe(1);
+    expect(response.body.truncated).toBe(false);
     expect(response.body.items[0]).toMatchObject({
       id: "B0FFTEST01",
       name: "京藏高速百葛服务区充电站",
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("marks a paginated nearby result as truncated", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => ({
+        ...fullAmapPoiResponse,
+        truncated: true,
+      }),
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.39&lat=39.90&radius=50000",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.truncated).toBe(true);
   });
 
   it("qualifies a text query and returns nationwide charging results", async () => {

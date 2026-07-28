@@ -137,7 +137,11 @@ export function App() {
           {keywordSearchActive ? (
             <KeywordResults state={keywordSearch} />
           ) : showList ? (
-            <StationList mode={mode} items={radarItems} />
+            <StationList
+              mode={mode}
+              items={radarItems}
+              truncated={search.truncated}
+            />
           ) : (
             <StateMessage
               trackerStatus={tracker.status}

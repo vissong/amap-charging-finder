@@ -139,6 +139,7 @@ describe("useChargingSearch", () => {
         return json({
           items: [ordinaryStation],
           count: 1,
+          truncated: true,
         } satisfies ListResponse<ChargingStation>);
       }
       if (url.pathname === "/api/road-context") {
@@ -165,6 +166,7 @@ describe("useChargingSearch", () => {
     expect(result.current.highwayState).toBe("normal");
     expect(result.current.serviceAreas).toEqual([]);
     expect(result.current.stations[0].id).toBe("ordinary");
+    expect(result.current.truncated).toBe(true);
   });
 
   it("prioritizes a service-area station on a confirmed highway", async () => {

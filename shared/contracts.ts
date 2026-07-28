@@ -59,6 +59,7 @@ export type SearchRadius = 3_000 | 5_000 | 10_000 | 20_000 | 50_000;
 export interface ListResponse<T> {
   items: T[];
   count: number;
+  truncated?: boolean;
 }
 
 export interface StationSearchResponse

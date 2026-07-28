@@ -69,6 +69,7 @@ export interface ChargingSearchState {
   serviceAreas: ServiceArea[];
   roadContext: RoadContext | null;
   highwayState: HighwayState;
+  truncated: boolean;
   error: { code: ApiErrorCode; message: string } | null;
   retry: () => void;
 }
@@ -87,6 +88,7 @@ const emptyState: Omit<ChargingSearchState, "status" | "retry"> = {
   serviceAreas: [],
   roadContext: null,
   highwayState: "normal",
+  truncated: false,
   error: null,
 };
 
@@ -202,6 +204,7 @@ export function useChargingSearch({
           serviceAreas: areaResponse.items,
           roadContext,
           highwayState,
+          truncated: stationResponse.truncated ?? false,
           error: null,
         });
       })

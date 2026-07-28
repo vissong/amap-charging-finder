@@ -7,6 +7,7 @@ import { StationCard } from "./StationCard";
 interface StationListProps {
   mode: SearchMode;
   items: RadarItem[];
+  truncated?: boolean;
 }
 
 function directionLabel(bearing: number): string {
@@ -14,7 +15,11 @@ function directionLabel(bearing: number): string {
   return directions[Math.round(bearing / 45) % directions.length];
 }
 
-export function StationList({ mode, items }: StationListProps) {
+export function StationList({
+  mode,
+  items,
+  truncated = false,
+}: StationListProps) {
   return (
     <div className="station-list">
       <div className="station-list__heading">
@@ -22,9 +27,10 @@ export function StationList({ mode, items }: StationListProps) {
           <span>{mode === "forward" ? "FORWARD" : "NEARBY"}</span>
           <h2>{mode === "forward" ? "前方建议" : "附近站点"}</h2>
         </div>
-        <strong>
+        <strong title={truncated ? "结果已达到查询上限" : undefined}>
           <Navigation aria-hidden="true" size={16} />
           {items.length}
+          {truncated ? "+" : ""}
         </strong>
       </div>
       <div className="station-list__items">

@@ -44,6 +44,14 @@ function upstreamError(response: Response): void {
   });
 }
 
+function isTruncated(payload: unknown): boolean {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    (payload as Record<string, unknown>).truncated === true
+  );
+}
+
 function asyncRoute(
   handler: (request: Request, response: Response) => Promise<void>,
 ): (request: Request, response: Response) => void {
@@ -70,7 +78,11 @@ export function createApiRouter(amapClient: AmapClient): Router {
 
       const raw = await amapClient.searchChargingStations(parsed.data);
       const items = normalizeChargingStations(raw);
-      response.json({ items, count: items.length });
+      response.json({
+        items,
+        count: items.length,
+        truncated: isTruncated(raw),
+      });
     }),
   );
 
