@@ -51,6 +51,8 @@ export interface RoadContext {
 }
 
 export type HighwayState = "normal" | "possible" | "confirmed";
+export type SearchMode = "nearby" | "forward";
+export type SearchRadius = 3_000 | 5_000 | 10_000 | 20_000 | 50_000;
 
 export interface ListResponse<T> {
   items: T[];
