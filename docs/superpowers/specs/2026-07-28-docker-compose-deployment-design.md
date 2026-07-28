@@ -38,11 +38,13 @@ git pull --ff-only
 
 ```dotenv
 AMAP_WEB_SERVICE_KEY=
+PORT=3000
 APP_PORT=3000
 DOMAIN=
 ```
 
 - `AMAP_WEB_SERVICE_KEY`：必填，只在运行时注入应用容器。
+- `PORT`：可选，只用于不经过 Docker 的本地开发，默认 `3000`。
 - `APP_PORT`：可选，服务器对外暴露的 HTTP 端口，默认 `3000`。
 - `DOMAIN`：可选；非空时启用 Caddy HTTPS profile。
 
