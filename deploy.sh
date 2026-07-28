@@ -32,10 +32,25 @@ read_env_value() {
   ' .env
 }
 
+valid_domain() {
+  local value="$1"
+  local label
+  local labels=()
+
+  [[ "$value" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || return 1
+  [[ "$value" != .* && "$value" != *".."* ]] || return 1
+
+  IFS='.' read -r -a labels <<<"$value"
+  for label in "${labels[@]}"; do
+    (( ${#label} <= 63 )) || return 1
+    [[ "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] ||
+      return 1
+  done
+}
+
 [[ -f compose.yaml ]] || fail "当前目录缺少 compose.yaml"
 command -v docker >/dev/null 2>&1 || fail "未安装 Docker"
 docker info >/dev/null 2>&1 || fail "Docker 服务不可用"
-docker compose version >/dev/null 2>&1 || fail "Docker Compose 不可用"
 [[ -f .env ]] || fail "缺少 .env，请先执行 cp .env.example .env"
 
 amap_key="$(read_env_value AMAP_WEB_SERVICE_KEY)"
@@ -52,20 +67,41 @@ esac
   fail "APP_PORT 必须是 1 至 65535 的整数"
 
 domain="$(read_env_value DOMAIN)"
-if [[ -n "$domain" && ! "$domain" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+if [[ -n "$domain" ]] && ! valid_domain "$domain"; then
   fail "DOMAIN 必须是纯域名，不能包含 http://、端口或路径"
 fi
 
-compose_args=(compose)
-if [[ -n "$domain" ]]; then
-  compose_args+=(--profile https)
-else
-  docker compose --profile https rm --stop --force caddy >/dev/null 2>&1 || true
+run_compose() {
+  (
+    unset COMPOSE_FILE COMPOSE_PROFILES
+    export ENV_FILE="$root/.env"
+    export APP_PORT="$app_port"
+    export DOMAIN="$domain"
+    docker compose \
+      --file "$root/compose.yaml" \
+      --env-file "$root/.env" \
+      "$@"
+  )
+}
+
+run_compose version >/dev/null 2>&1 || fail "Docker Compose 不可用"
+
+run_selected_compose() {
+  if [[ -n "$domain" ]]; then
+    run_compose --profile https "$@"
+  else
+    run_compose "$@"
+  fi
+}
+
+if [[ -z "$domain" ]]; then
+  run_compose --profile https rm --stop --force caddy >/dev/null 2>&1 ||
+    fail "停止旧 Caddy 服务失败"
 fi
 
-docker "${compose_args[@]}" up -d --build --remove-orphans
+run_selected_compose up -d --build --remove-orphans
 
-container_id="$(docker "${compose_args[@]}" ps -q app)"
+container_id="$(run_selected_compose ps -q app)"
 [[ -n "$container_id" ]] || fail "应用容器未创建"
 
 for _ in $(seq 1 30); do
