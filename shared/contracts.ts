@@ -50,6 +50,8 @@ export interface RoadContext {
   roadDistanceMeters: number | null;
 }
 
+export type HighwayState = "normal" | "possible" | "confirmed";
+
 export interface ListResponse<T> {
   items: T[];
   count: number;
