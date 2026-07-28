@@ -97,7 +97,7 @@ export function createAmapClient({
       radius: String(query.radius),
       types: typecode,
       sortrule: "distance",
-      show_fields: "business,navi,photos,children",
+      show_fields: "business,navi,children",
       page_size: "25",
       page_num: "1",
       output: "json",

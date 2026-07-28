@@ -23,7 +23,12 @@ const station: ChargingStation = {
   openingWeek: null,
   entrance: null,
   exit: null,
-  photos: [],
+  photos: [
+    {
+      title: "站点图片",
+      url: "https://example.com/station.jpg",
+    },
+  ],
   children: [],
 };
 
@@ -41,6 +46,9 @@ describe("StationCard", () => {
       screen.getByText("实时充电信息请前往高德地图查看"),
     ).toBeVisible();
     expect(screen.queryByText(/空闲枪|充电功率|电价/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "站点图片" }),
+    ).not.toBeInTheDocument();
 
     const amapLink = screen.getByRole("link", { name: "在高德查看" });
     expect(amapLink).toHaveAttribute("target", "_blank");

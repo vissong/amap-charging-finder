@@ -31,7 +31,7 @@ describe("AMap HTTP client", () => {
     );
     expect(parsedUrl.searchParams.get("types")).toBe("011100");
     expect(parsedUrl.searchParams.get("show_fields")).toBe(
-      "business,navi,photos,children",
+      "business,navi,children",
     );
     expect(parsedUrl.searchParams.get("page_size")).toBe("25");
     expect(parsedUrl.searchParams.get("key")).toBe("server-only-key");

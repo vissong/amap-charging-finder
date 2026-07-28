@@ -155,19 +155,6 @@ export function StationCard({
             </div>
           )}
 
-          {station.photos.length > 0 && (
-            <div className="poi-photos">
-              {station.photos.slice(0, 3).map((photo) => (
-                <img
-                  key={photo.url}
-                  src={photo.url}
-                  alt={photo.title ?? `${station.name}实景`}
-                  loading="lazy"
-                />
-              ))}
-            </div>
-          )}
-
           <p className="data-boundary">
             实时充电信息请前往高德地图查看
           </p>
