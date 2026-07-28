@@ -22,15 +22,25 @@ cat >"$fake_bin/docker" <<'FAKE_DOCKER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >>"$DOCKER_CALLS"
+
+assert_success_not_reported() {
+  if grep -Fq '部署成功：' "$DEPLOY_OUTPUT"; then
+    echo "health confirmation must occur before deployment success" >&2
+    exit 9
+  fi
+}
+
 case "$*" in
   "info"|"compose version"|"compose up -d --build --remove-orphans"|\
   "compose --profile https up -d --build --remove-orphans"|\
   "compose --profile https rm --stop --force caddy")
     ;;
   "compose ps -q app"|"compose --profile https ps -q app")
+    assert_success_not_reported
     printf 'test-container\n'
     ;;
   inspect\ --format*test-container)
+    assert_success_not_reported
     printf 'healthy\n'
     ;;
   *)
@@ -45,7 +55,7 @@ run_deploy() {
   : >"$calls"
   (
     cd "$case_dir"
-    PATH="$fake_bin:$PATH" DOCKER_CALLS="$calls" ./deploy.sh
+    PATH="$fake_bin:$PATH" DOCKER_CALLS="$calls" DEPLOY_OUTPUT="$output" ./deploy.sh
   ) >"$output" 2>&1
 }
 
@@ -85,6 +95,11 @@ grep -F "APP_PORT" "$output"
 printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' >"$case_dir/.env"
 run_deploy
 grep -Fx "compose up -d --build --remove-orphans" "$calls"
+grep -Fx "compose ps -q app" "$calls"
+grep -Fx "inspect --format {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}} test-container" "$calls"
+ps_line="$(grep -n -Fx "compose ps -q app" "$calls" | cut -d: -f1)"
+inspect_line="$(grep -n -Fx "inspect --format {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}} test-container" "$calls" | cut -d: -f1)"
+(( ps_line < inspect_line ))
 grep -F "http://" "$output"
 ! grep -F "test-secret" "$output"
 ! grep -F "test-secret" "$calls"
