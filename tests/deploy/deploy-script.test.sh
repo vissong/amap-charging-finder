@@ -103,3 +103,25 @@ inspect_line="$(grep -n -Fx "inspect --format {{if .State.Health}}{{.State.Healt
 grep -F "http://" "$output"
 ! grep -F "test-secret" "$output"
 ! grep -F "test-secret" "$calls"
+
+# Domain deployment enables the profile.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=charge.example.com\n' \
+  >"$case_dir/.env"
+run_deploy
+grep -Fx "compose --profile https up -d --build --remove-orphans" "$calls"
+grep -F "https://charge.example.com" "$output"
+
+# Removing DOMAIN stops the old optional proxy without deleting named volumes.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' \
+  >"$case_dir/.env"
+run_deploy
+grep -Fx "compose --profile https rm --stop --force caddy" "$calls"
+
+# URL, port, and path are rejected instead of being passed to Caddy.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=https://charge.example.com\n' \
+  >"$case_dir/.env"
+if run_deploy; then
+  echo "DOMAIN with scheme must fail" >&2
+  exit 1
+fi
+grep -F "DOMAIN" "$output"

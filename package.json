@@ -9,11 +9,11 @@
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:deploy": "bash tests/deploy/deploy-script.test.sh",
+    "test:deploy": "bash tests/deploy/deploy-script.test.sh && bash tests/deploy/https-config.test.sh",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "verify:no-key": "tsx scripts/verify-no-key.ts",
-    "check": "npm run test && npm run test:deploy && npm run typecheck && npm run build && npm run verify:no-key"
+    "check": "npm run test && bash tests/deploy/deploy-script.test.sh && npm run typecheck && npm run build && npm run verify:no-key"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.3.0",

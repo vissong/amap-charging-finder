@@ -26,3 +26,26 @@ services:
       timeout: 3s
       retries: 12
       start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    profiles:
+      - https
+    environment:
+      DOMAIN: "${DOMAIN:-}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

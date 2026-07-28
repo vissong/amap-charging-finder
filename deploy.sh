@@ -51,9 +51,21 @@ esac
 (( app_port >= 1 && app_port <= 65535 )) ||
   fail "APP_PORT 必须是 1 至 65535 的整数"
 
-docker compose up -d --build --remove-orphans
+domain="$(read_env_value DOMAIN)"
+if [[ -n "$domain" && ! "$domain" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+  fail "DOMAIN 必须是纯域名，不能包含 http://、端口或路径"
+fi
 
-container_id="$(docker compose ps -q app)"
+compose_args=(compose)
+if [[ -n "$domain" ]]; then
+  compose_args+=(--profile https)
+else
+  docker compose --profile https rm --stop --force caddy >/dev/null 2>&1 || true
+fi
+
+docker "${compose_args[@]}" up -d --build --remove-orphans
+
+container_id="$(docker "${compose_args[@]}" ps -q app)"
 [[ -n "$container_id" ]] || fail "应用容器未创建"
 
 for _ in $(seq 1 30); do
@@ -74,3 +86,7 @@ done
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 server_ip="${server_ip:-<服务器IP>}"
 printf '部署成功： http://%s:%s\n' "$server_ip" "$app_port"
+if [[ -n "$domain" ]]; then
+  printf 'HTTPS 地址： https://%s\n' "$domain"
+  printf '证书状态： docker compose --profile https logs caddy\n'
+fi
