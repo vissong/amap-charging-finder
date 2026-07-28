@@ -4,6 +4,11 @@ set -euo pipefail
 project="amap-deploy-test-$$"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose=(docker compose -p "$project")
+reports_dir="$root/reports"
+context_dir="$reports_dir/.docker-context-test-$$"
+context_dockerfile="$root/Dockerfile.context-test-$$"
+context_image="${project}-context-test"
+context_log="$(mktemp)"
 
 cleanup() {
   (
@@ -11,10 +16,28 @@ cleanup() {
     ENV_FILE=tests/deploy/fixtures/valid.env APP_PORT=0 \
       "${compose[@]}" down -v --remove-orphans
   ) >/dev/null 2>&1 || true
+  docker image rm -f "$context_image" >/dev/null 2>&1 || true
+  rm -rf "$context_dir"
+  rmdir "$reports_dir" >/dev/null 2>&1 || true
+  rm -f "$context_dockerfile" "$context_log"
 }
 trap cleanup EXIT
 
 cd "$root"
+mkdir -p "$context_dir"
+printf 'build-context-sentinel\n' > "$context_dir/sentinel"
+printf '%s\n' \
+  'FROM node:22-alpine' \
+  'COPY reports /reports' \
+  'RUN test -f /reports/.docker-context-test-'"$$"'/sentinel' \
+  > "$context_dockerfile"
+
+if docker build --tag "$context_image" --file "$context_dockerfile" "$root" >"$context_log" 2>&1; then
+  echo 'reports/ was included in the Docker build context' >&2
+  exit 1
+fi
+grep -F 'reports' "$context_log" >/dev/null
+
 ENV_FILE=tests/deploy/fixtures/valid.env APP_PORT=0 \
   "${compose[@]}" up -d --build app
 
