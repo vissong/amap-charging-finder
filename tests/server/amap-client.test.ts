@@ -62,6 +62,36 @@ describe("AMap HTTP client", () => {
     expect(new URL(requestedUrl).searchParams.get("types")).toBe("180300");
   });
 
+  it("searches charging stations nationwide with a qualified keyword", async () => {
+    let requestedUrl = "";
+    const fetchImpl: typeof fetch = async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify(fullAmapPoiResponse), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+    });
+
+    await client.searchChargingStationsByKeyword(
+      "孟村服务区 充电站",
+    );
+
+    const parsedUrl = new URL(requestedUrl);
+    expect(parsedUrl.pathname).toBe("/v5/place/text");
+    expect(parsedUrl.searchParams.get("keywords")).toBe(
+      "孟村服务区 充电站",
+    );
+    expect(parsedUrl.searchParams.get("types")).toBe("011100");
+    expect(parsedUrl.searchParams.has("region")).toBe(false);
+    expect(parsedUrl.searchParams.get("show_fields")).toBe(
+      "business,navi,children",
+    );
+  });
+
   it("rejects a successful HTTP response with an AMap failure status", async () => {
     const client = createAmapClient({
       key: "server-only-key",

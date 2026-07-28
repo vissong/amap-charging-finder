@@ -34,6 +34,15 @@ const station: ChargingStation = {
   children: [],
 };
 
+const keywordStation: ChargingStation = {
+  ...station,
+  id: "keyword-station-1",
+  name: "孟村服务区充电站",
+  distanceMeters: 0,
+  address: "京沪高速孟村服务区",
+  district: "孟村回族自治县",
+};
+
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -73,6 +82,16 @@ beforeEach(() => {
         nearestRoad: "望京路",
         roadDistanceMeters: 9,
       } satisfies RoadContext);
+    }
+    if (url.pathname === "/api/search-stations") {
+      return json({
+        query: {
+          display: "孟村服务区",
+          submitted: "孟村服务区 充电站",
+        },
+        items: [keywordStation],
+        count: 1,
+      });
     }
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
@@ -151,6 +170,32 @@ describe("App", () => {
     );
     expect(
       screen.getByRole("button", { name: "重新定位" }),
+    ).toBeVisible();
+  });
+
+  it("searches a named place with a charging qualifier before location is ready", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "搜索指定地点" }),
+      "孟村服务区",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "搜索充电站" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "孟村服务区充电站",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("已按“孟村服务区 充电站”搜索"),
+    ).toBeVisible();
+    expect(screen.queryByText("0 m")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "返回附近" }),
     ).toBeVisible();
   });
 });

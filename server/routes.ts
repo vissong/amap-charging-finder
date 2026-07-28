@@ -7,6 +7,7 @@ import {
   normalizeRoadContext,
   normalizeServiceAreas,
 } from "./normalize";
+import { normalizeStationKeyword } from "../shared/search-keyword";
 
 const allowedRadii = [3_000, 5_000, 10_000, 20_000, 50_000];
 
@@ -19,6 +20,10 @@ const nearbyQuery = coordinatesQuery.extend({
   radius: z.coerce
     .number()
     .refine((value) => allowedRadii.includes(value)),
+});
+
+const keywordQuery = z.object({
+  keywords: z.string(),
 });
 
 function invalidQuery(response: Response): void {
@@ -66,6 +71,26 @@ export function createApiRouter(amapClient: AmapClient): Router {
       const raw = await amapClient.searchChargingStations(parsed.data);
       const items = normalizeChargingStations(raw);
       response.json({ items, count: items.length });
+    }),
+  );
+
+  router.get(
+    "/search-stations",
+    asyncRoute(async (request, response) => {
+      const parsed = keywordQuery.safeParse(request.query);
+      const query = parsed.success
+        ? normalizeStationKeyword(parsed.data.keywords)
+        : null;
+      if (!query) {
+        invalidQuery(response);
+        return;
+      }
+
+      const raw = await amapClient.searchChargingStationsByKeyword(
+        query.submitted,
+      );
+      const items = normalizeChargingStations(raw);
+      response.json({ query, items, count: items.length });
     }),
   );
 

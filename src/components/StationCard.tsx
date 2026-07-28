@@ -18,6 +18,7 @@ interface StationCardProps {
   serviceAreaMatch?: ServiceAreaMatch | null;
   recommendationOrder?: number | null;
   directionLabel?: string | null;
+  showDistance?: boolean;
 }
 
 function formatDistance(distanceMeters: number): string {
@@ -37,6 +38,7 @@ export function StationCard({
   serviceAreaMatch = null,
   recommendationOrder = null,
   directionLabel = null,
+  showDistance = true,
 }: StationCardProps) {
   const [expanded, setExpanded] = useState(false);
   const address = [station.district, station.address]
@@ -89,10 +91,14 @@ export function StationCard({
             </p>
           )}
 
-          <div className="station-card__metrics">
-            <strong>{formatDistance(station.distanceMeters)}</strong>
-            {directionLabel && <span>{directionLabel}</span>}
-          </div>
+          {(showDistance || directionLabel) && (
+            <div className="station-card__metrics">
+              {showDistance && (
+                <strong>{formatDistance(station.distanceMeters)}</strong>
+              )}
+              {directionLabel && <span>{directionLabel}</span>}
+            </div>
+          )}
         </div>
 
         <button

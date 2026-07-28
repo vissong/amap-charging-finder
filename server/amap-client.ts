@@ -6,6 +6,7 @@ export interface NearbySearchQuery extends Coordinates {
 
 export interface AmapClient {
   searchChargingStations(query: NearbySearchQuery): Promise<unknown>;
+  searchChargingStationsByKeyword(keywords: string): Promise<unknown>;
   searchServiceAreas(query: NearbySearchQuery): Promise<unknown>;
   reverseGeocode(query: Coordinates): Promise<unknown>;
 }
@@ -107,6 +108,16 @@ export function createAmapClient({
   return {
     searchChargingStations(query) {
       return searchNearby(query, "011100");
+    },
+    searchChargingStationsByKeyword(keywords) {
+      return request("/v5/place/text", {
+        keywords,
+        types: "011100",
+        show_fields: "business,navi,children",
+        page_size: "25",
+        page_num: "1",
+        output: "json",
+      });
     },
     searchServiceAreas(query) {
       return searchNearby(query, "180300");

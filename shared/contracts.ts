@@ -1,3 +1,5 @@
+import type { StationKeyword } from "./search-keyword";
+
 export interface Coordinates {
   lng: number;
   lat: number;
@@ -57,4 +59,9 @@ export type SearchRadius = 3_000 | 5_000 | 10_000 | 20_000 | 50_000;
 export interface ListResponse<T> {
   items: T[];
   count: number;
+}
+
+export interface StationSearchResponse
+  extends ListResponse<ChargingStation> {
+  query: StationKeyword;
 }

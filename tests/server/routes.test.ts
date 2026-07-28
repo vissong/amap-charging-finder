@@ -14,6 +14,7 @@ function fakeAmapClient(
 ): AmapClient {
   return {
     searchChargingStations: async () => fullAmapPoiResponse,
+    searchChargingStationsByKeyword: async () => fullAmapPoiResponse,
     searchServiceAreas: async () => amapServiceAreaResponse,
     reverseGeocode: async () => amapRoadContextResponse,
     ...overrides,
@@ -60,6 +61,33 @@ describe("API routes", () => {
       name: "京藏高速百葛服务区充电站",
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("qualifies a text query and returns nationwide charging results", async () => {
+    let submittedKeyword = "";
+    const amapClient = fakeAmapClient({
+      searchChargingStationsByKeyword: async (keywords) => {
+        submittedKeyword = keywords;
+        return fullAmapPoiResponse;
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/search-stations?keywords=%E5%AD%9F%E6%9D%91%E6%9C%8D%E5%8A%A1%E5%8C%BA",
+    );
+
+    expect(response.status).toBe(200);
+    expect(submittedKeyword).toBe("孟村服务区 充电站");
+    expect(response.body).toMatchObject({
+      query: {
+        display: "孟村服务区",
+        submitted: "孟村服务区 充电站",
+      },
+      count: 1,
+    });
+    expect(response.body.items[0].name).toBe(
+      "京藏高速百葛服务区充电站",
+    );
   });
 
   it("returns normalized service areas and road context", async () => {

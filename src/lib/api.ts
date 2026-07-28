@@ -4,6 +4,7 @@ import type {
   ListResponse,
   RoadContext,
   ServiceArea,
+  StationSearchResponse,
 } from "../../shared/contracts";
 
 export type ApiErrorCode =
@@ -71,6 +72,17 @@ export function fetchChargingStations(
   return requestJson(
     "/api/charging-stations",
     { ...coordinateParams(location), radius: String(radius) },
+    options,
+  );
+}
+
+export function fetchStationsByKeyword(
+  keywords: string,
+  options: QueryOptions,
+): Promise<StationSearchResponse> {
+  return requestJson(
+    "/api/search-stations",
+    { keywords },
     options,
   );
 }

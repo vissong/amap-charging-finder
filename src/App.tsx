@@ -12,17 +12,21 @@ import {
   RoadRadar,
   type RadarItem,
 } from "./components/RoadRadar";
+import { KeywordResults } from "./components/KeywordResults";
 import { StateMessage } from "./components/StateMessage";
 import { StationList } from "./components/StationList";
+import { StationSearch } from "./components/StationSearch";
 import { StatusBar } from "./components/StatusBar";
 import { useChargingSearch } from "./hooks/useChargingSearch";
 import { useDriveTracker } from "./hooks/useDriveTracker";
+import { useStationKeywordSearch } from "./hooks/useStationKeywordSearch";
 import "./styles.css";
 
 export function App() {
   const [mode, setMode] = useState<SearchMode>("nearby");
   const [radius, setRadius] = useState<SearchRadius>(10_000);
   const tracker = useDriveTracker();
+  const keywordSearch = useStationKeywordSearch();
   const search = useChargingSearch({
     latest: tracker.latest,
     motion: tracker.motion,
@@ -68,6 +72,7 @@ export function App() {
     search.status === "success" &&
     tracker.status === "ready" &&
     radarItems.length > 0;
+  const keywordSearchActive = keywordSearch.status !== "idle";
 
   return (
     <div className="app-shell">
@@ -99,28 +104,39 @@ export function App() {
         highwayState={search.highwayState}
       />
 
-      <main className="dashboard" id="main-content">
-        <section className="radar-panel" aria-label="搜索控制与相对位置">
-          <ModeControls
-            mode={mode}
-            radius={radius}
-            onModeChange={setMode}
-            onRadiusChange={setRadius}
-          />
-          <RoadRadar
-            mode={mode}
-            radius={radius}
-            heading={tracker.motion.heading}
-            items={radarItems}
-          />
-          <div className="radar-disclaimer">
-            <span>公开 POI</span>
-            <p>不模拟枪数、功率、价格或忙闲状态</p>
-          </div>
-        </section>
+      <StationSearch state={keywordSearch} />
+
+      <main
+        className={`dashboard${
+          keywordSearchActive ? " dashboard--keyword" : ""
+        }`}
+        id="main-content"
+      >
+        {!keywordSearchActive && (
+          <section className="radar-panel" aria-label="搜索控制与相对位置">
+            <ModeControls
+              mode={mode}
+              radius={radius}
+              onModeChange={setMode}
+              onRadiusChange={setRadius}
+            />
+            <RoadRadar
+              mode={mode}
+              radius={radius}
+              heading={tracker.motion.heading}
+              items={radarItems}
+            />
+            <div className="radar-disclaimer">
+              <span>公开 POI</span>
+              <p>不模拟枪数、功率、价格或忙闲状态</p>
+            </div>
+          </section>
+        )}
 
         <section className="results-panel" aria-label="充电站查询结果">
-          {showList ? (
+          {keywordSearchActive ? (
+            <KeywordResults state={keywordSearch} />
+          ) : showList ? (
             <StationList mode={mode} items={radarItems} />
           ) : (
             <StateMessage

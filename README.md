@@ -5,6 +5,7 @@
 ## 功能
 
 - 按当前位置查询 3、5、10、20 或 50 公里内的充电站。
+- 按服务区、充电站或地点名称进行全国搜索；例如输入“孟村服务区”会自动按“孟村服务区 充电站”查询。
 - 持续定位并结合速度、移动轨迹推算行进方向。
 - “前方推荐”模式过滤明显位于车后的站点。
 - 根据高德逆地理编码识别高速场景，并优先推荐前方服务区内的充电站。
@@ -56,6 +57,7 @@ GET /api/health
 
 ```text
 GET /api/charging-stations?lng=116.4&lat=39.9&radius=5000
+GET /api/search-stations?keywords=孟村服务区
 GET /api/service-areas?lng=116.4&lat=39.9&radius=5000
 GET /api/road-context?lng=116.4&lat=39.9
 ```
