@@ -5,7 +5,11 @@ project="amap-deploy-test-$$"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose=(docker compose -p "$project")
 reports_dir="$root/reports"
-context_dir="$reports_dir/.docker-context-test-$$"
+context_dir=""
+context_dir_created=false
+preexisting_context_dir="$reports_dir/.docker-context-test-$$"
+preexisting_sentinel="$preexisting_context_dir/preexisting-sentinel"
+preexisting_fixture_created=false
 context_dockerfile="$root/Dockerfile.context-test-$$"
 context_image="${project}-context-test"
 context_log="$(mktemp)"
@@ -17,14 +21,35 @@ cleanup() {
       "${compose[@]}" down -v --remove-orphans
   ) >/dev/null 2>&1 || true
   docker image rm -f "$context_image" >/dev/null 2>&1 || true
-  rm -rf "$context_dir"
-  rmdir "$reports_dir" >/dev/null 2>&1 || true
+  if [[ "$context_dir_created" == true ]]; then
+    rm -rf "$context_dir"
+  fi
   rm -f "$context_dockerfile" "$context_log"
 }
-trap cleanup EXIT
+
+verify_cleanup_safety() {
+  cleanup
+  if [[ "$preexisting_fixture_created" == true ]]; then
+    if [[ ! -f "$preexisting_sentinel" ]]; then
+      echo 'pre-existing Docker context test content was deleted' >&2
+      exit 1
+    fi
+    rm -rf "$preexisting_context_dir"
+  fi
+  rmdir "$reports_dir" >/dev/null 2>&1 || true
+}
+trap verify_cleanup_safety EXIT
 
 cd "$root"
-mkdir -p "$context_dir"
+if [[ -e "$preexisting_context_dir" ]]; then
+  echo 'refusing to overwrite a pre-existing Docker context test fixture' >&2
+  exit 1
+fi
+mkdir -p "$preexisting_context_dir"
+printf 'pre-existing sentinel\n' > "$preexisting_sentinel"
+preexisting_fixture_created=true
+context_dir="$(mktemp -d "$reports_dir/.docker-context-test.XXXXXX")"
+context_dir_created=true
 printf 'build-context-sentinel\n' > "$context_dir/sentinel"
 printf '%s\n' \
   'FROM node:22-alpine' \
