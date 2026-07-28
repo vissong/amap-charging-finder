@@ -63,6 +63,42 @@ GET /api/service-areas?lng=116.4&lat=39.9&radius=5000
 GET /api/road-context?lng=116.4&lat=39.9
 ```
 
+## Docker Compose 一键部署
+
+服务器需已安装 Git、Docker Engine 和 Docker Compose 插件。克隆项目并准备配置：
+
+```bash
+git clone https://github.com/vissong/amap-charging-finder.git
+cd amap-charging-finder
+cp .env.example .env
+# 编辑 .env，至少填写 AMAP_WEB_SERVICE_KEY
+./deploy.sh
+```
+
+`PORT` 保留给非 Docker 的 `npm run dev` 和 `npm start`；Docker 容器内部固定使用 3000 端口，`APP_PORT` 仅控制服务器对外暴露的端口。未设置域名时，使用 `http://服务器IP:APP_PORT` 访问。
+
+如需 HTTPS，将域名 DNS 解析到服务器，放行 TCP 80 和 443，在 `.env` 中设置 `DOMAIN` 后重新运行 `./deploy.sh`。多数移动浏览器会拒绝 HTTP IP 地址上的地理位置权限；此时按名称搜索仍可使用，但“附近”和“前方定位”需要 HTTPS。
+
+常用运维命令：
+
+```bash
+# 更新
+git pull --ff-only && ./deploy.sh
+
+# 查看状态与应用日志
+docker compose ps
+docker compose logs -f app
+
+# 查看 HTTPS 反向代理日志
+docker compose --profile https logs -f caddy
+
+# 停止服务，保留证书
+docker compose --profile https down
+
+# 仅在有意重置 HTTPS 时，删除容器和证书卷
+docker compose --profile https down -v
+```
+
 ## 验证
 
 ```bash
