@@ -1,11 +1,11 @@
 import "dotenv/config";
 
-import express from "express";
 import { resolve } from "node:path";
 
 import { createAmapClient } from "./amap-client";
 import { createApp } from "./app";
 import { getServerConfig } from "./config";
+import { serveProductionFrontend } from "./frontend";
 
 async function main(): Promise<void> {
   const config = getServerConfig();
@@ -14,14 +14,7 @@ async function main(): Promise<void> {
 
   if (process.env.NODE_ENV === "production") {
     const dist = resolve("dist");
-    app.use(express.static(dist));
-    app.use((request, response, next) => {
-      if (request.method !== "GET" || request.path.startsWith("/api/")) {
-        next();
-        return;
-      }
-      response.sendFile(resolve(dist, "index.html"));
-    });
+    serveProductionFrontend(app, dist);
   } else {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
