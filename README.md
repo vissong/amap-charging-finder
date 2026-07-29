@@ -75,9 +75,41 @@ cp .env.example .env
 ./deploy.sh
 ```
 
-`PORT` 保留给非 Docker 的 `npm run dev` 和 `npm start`；Docker 容器内部固定使用 3000 端口，`APP_PORT` 仅控制服务器对外暴露的端口。未设置域名时，使用 `http://服务器IP:APP_PORT` 访问。
+`PORT` 保留给非 Docker 的 `npm run dev` 和 `npm start`；Docker 容器内部固定使用 3000 端口，`APP_PORT` 仅控制服务器对外暴露的端口。
 
-如需 HTTPS，将域名 DNS 解析到服务器，放行 TCP 80 和 443，在 `.env` 中设置 `DOMAIN` 后重新运行 `./deploy.sh`。多数移动浏览器会拒绝 HTTP IP 地址上的地理位置权限；此时按名称搜索仍可使用，但“附近”和“前方定位”需要 HTTPS。
+访问方式通过 `.env` 选择：
+
+```dotenv
+# 域名 HTTPS：先将域名 DNS 解析到服务器
+DOMAIN=charge.example.com
+PUBLIC_IP=
+
+# 公网 IP HTTPS：填写固定公网 IPv4 或 IPv6，不要填写协议、端口或路径
+DOMAIN=
+PUBLIC_IP=203.0.113.10
+
+# 纯 HTTP IP：两项都留空
+DOMAIN=
+PUBLIC_IP=
+```
+
+`DOMAIN` 与 `PUBLIC_IP` 只能设置一个。域名或公网 IP HTTPS 都要求 TCP 80 和 443 能从公网直接到达服务器；公网 IP 模式不能填写内网地址、动态出口地址或负载均衡后的错误地址。两项都为空时，使用 `http://服务器IP:APP_PORT` 访问。
+
+公网 IP 证书由 Let’s Encrypt 的 `shortlived` profile 签发，支持 IPv4 和 IPv6，有效期约 160 小时，由 Caddy 自动续期。部署成功后可通过 `docker compose --profile https logs caddy` 查看签发和续期状态。
+
+### HTTPS 与定位权限
+
+有效且受浏览器信任的域名 HTTPS **不会妨碍定位**，而是移动浏览器开放 Geolocation API 所需的安全上下文。有效的公网 IP HTTPS 同样属于安全上下文。HTTP 公网 IP 通常只能使用名称搜索，“附近”和“前方推荐”会因定位 API 受限而不可用。
+
+HTTPS 只满足安全前提，最终能否获得位置还取决于：
+
+- 用户是否允许该站点访问位置；
+- 手机或车机系统定位服务是否开启；
+- 浏览器或车机 WebView 是否获得系统定位权限并实现 Geolocation；
+- 页面若被跨域 iframe 嵌入，上层页面是否通过 `Permissions-Policy` 和 `allow="geolocation"` 放行；
+- 设备当前是否能获得 GPS、网络或融合定位结果。
+
+相关浏览器规则可参考 [MDN Geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API) 和 [Permissions-Policy: geolocation](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Permissions-Policy/geolocation)。
 
 常用运维命令：
 
