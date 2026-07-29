@@ -1,4 +1,4 @@
-import { Navigation } from "lucide-react";
+import { Navigation, RefreshCw } from "lucide-react";
 
 import type { SearchMode } from "../../shared/contracts";
 import type { RadarItem } from "./RoadRadar";
@@ -8,6 +8,7 @@ interface StationListProps {
   mode: SearchMode;
   items: RadarItem[];
   truncated?: boolean;
+  onRefresh?: () => void;
 }
 
 function directionLabel(bearing: number): string {
@@ -19,6 +20,7 @@ export function StationList({
   mode,
   items,
   truncated = false,
+  onRefresh,
 }: StationListProps) {
   return (
     <div className="station-list">
@@ -27,11 +29,22 @@ export function StationList({
           <span>{mode === "forward" ? "FORWARD" : "NEARBY"}</span>
           <h2>{mode === "forward" ? "前方建议" : "附近站点"}</h2>
         </div>
-        <strong title={truncated ? "结果已达到查询上限" : undefined}>
-          <Navigation aria-hidden="true" size={16} />
-          {items.length}
-          {truncated ? "+" : ""}
-        </strong>
+        <div className="station-list__tools">
+          <strong title={truncated ? "结果已达到查询上限" : undefined}>
+            <Navigation aria-hidden="true" size={16} />
+            {items.length}
+            {truncated ? "+" : ""}
+          </strong>
+          {onRefresh && (
+            <button
+              type="button"
+              aria-label="刷新充电站结果"
+              onClick={onRefresh}
+            >
+              <RefreshCw aria-hidden="true" size={17} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="station-list__items">
         {items.map((item) => (

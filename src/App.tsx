@@ -141,6 +141,7 @@ export function App() {
               mode={mode}
               items={radarItems}
               truncated={search.truncated}
+              onRefresh={search.retry}
             />
           ) : (
             <StateMessage

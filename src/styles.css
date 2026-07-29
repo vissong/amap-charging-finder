@@ -535,6 +535,32 @@ button {
   letter-spacing: 0.12em;
 }
 
+.radar-sweep {
+  pointer-events: none;
+  transform-box: view-box;
+  will-change: transform;
+}
+
+.road-radar--nearby .radar-sweep {
+  animation: radar-scan-round 3.6s linear infinite;
+}
+
+.road-radar--forward .radar-sweep {
+  animation: radar-scan-forward 2.4s linear infinite alternate;
+}
+
+.radar-sweep__trail {
+  fill: var(--charge);
+  opacity: 0.08;
+}
+
+.radar-sweep__beam {
+  stroke: var(--charge);
+  stroke-linecap: round;
+  stroke-width: 1.5;
+  opacity: 0.72;
+}
+
 .radar-marker circle {
   fill: var(--ink-300);
   stroke: var(--road-975);
@@ -644,7 +670,14 @@ button {
   line-height: 1.35;
 }
 
-.station-list__heading > strong {
+.station-list__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.station-list__heading > strong,
+.station-list__tools strong {
   display: flex;
   min-width: 3rem;
   align-items: center;
@@ -656,12 +689,32 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.station-list__tools button {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  padding: 0;
+  background: var(--road-800);
+  border: 0.0625rem solid var(--road-700);
+  border-radius: var(--radius-sm);
+  color: var(--ink-200);
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--ease-out-expo),
+    color 140ms var(--ease-out-expo),
+    transform 100ms var(--ease-out-expo);
+}
+
+.station-list__tools button:active {
+  transform: scale(0.96);
+}
+
 .station-list__items {
   display: grid;
 }
 
 .station-card {
-  container-type: inline-size;
   background: var(--road-925);
   border-bottom: 0.0625rem solid var(--road-700);
 }
@@ -775,127 +828,20 @@ button {
   font-size: 0.72rem;
 }
 
-.station-card__toggle {
-  display: grid;
-  width: 3rem;
-  height: 3rem;
-  place-items: center;
-  align-self: center;
-  padding: 0;
-  background: transparent;
-  border: 0.0625rem solid var(--road-700);
-  border-radius: var(--radius-sm);
-  color: var(--ink-300);
-  cursor: pointer;
-  transition:
-    background-color 140ms var(--ease-out-expo),
-    color 140ms var(--ease-out-expo);
-}
-
-.station-card__toggle[aria-expanded="true"] {
-  background: var(--road-800);
-  color: var(--charge);
-}
-
-.station-card__toggle[aria-expanded="true"] svg {
-  transform: rotate(180deg);
-}
-
-.station-card__toggle svg {
-  transition: transform 220ms var(--ease-out-expo);
-}
-
-.station-card__reveal {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 300ms var(--ease-out-expo);
-}
-
-.station-card__reveal[data-expanded="true"] {
-  grid-template-rows: 1fr;
-}
-
-.station-card__details {
-  min-height: 0;
-  overflow: hidden;
-  padding-inline: var(--space-4);
-}
-
-[data-expanded="true"] .station-card__details {
-  padding-bottom: var(--space-4);
-}
-
-.poi-details {
-  display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  padding: var(--space-4) 0;
-  border-top: 0.0625rem solid var(--road-700);
-}
-
-.poi-details > div {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
-.poi-details dt {
-  color: var(--ink-500);
-  font-size: 0.72rem;
-}
-
-.poi-details dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--ink-200);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.poi-children {
-  padding-block: var(--space-3);
-  border-top: 0.0625rem solid var(--road-700);
-}
-
-.poi-children > span {
-  color: var(--ink-500);
-  font-size: 0.72rem;
-}
-
-.poi-children ul {
-  display: grid;
-  gap: var(--space-1);
-  margin: var(--space-2) 0 0;
-  padding-left: var(--space-4);
-  color: var(--ink-200);
-  font-size: 0.78rem;
-}
-
-.data-boundary {
-  margin: 0;
-  padding: var(--space-3);
-  background: var(--route-soft);
-  color: var(--route);
-  font-size: 0.74rem;
-  line-height: 1.5;
-}
-
-.station-card__actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--space-2);
-  padding-top: var(--space-3);
-}
-
-.station-action {
+.station-card__amap {
   display: flex;
+  width: 3rem;
   min-height: 3rem;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  align-self: center;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--space-1);
+  background: var(--charge);
   border-radius: var(--radius-sm);
-  font-size: 0.82rem;
+  color: var(--road-975);
+  font-size: 0.64rem;
   font-weight: 700;
   text-decoration: none;
   transition:
@@ -903,18 +849,8 @@ button {
     transform 100ms var(--ease-out-expo);
 }
 
-.station-action:active {
-  transform: scale(0.98);
-}
-
-.station-action--primary {
-  background: var(--charge);
-  color: var(--road-975);
-}
-
-.station-action--secondary {
-  background: var(--road-800);
-  color: var(--ink-100);
+.station-card__amap:active {
+  transform: scale(0.96);
 }
 
 .state-message {
@@ -1006,6 +942,21 @@ button {
   }
 }
 
+@keyframes radar-scan-round {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-scan-forward {
+  from {
+    transform: rotate(-58deg);
+  }
+  to {
+    transform: rotate(24deg);
+  }
+}
+
 @keyframes skeleton-pulse {
   from {
     opacity: 0.45;
@@ -1015,20 +966,10 @@ button {
   }
 }
 
-@container (min-width: 30rem) {
-  .poi-details {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .poi-details > div {
-    grid-template-columns: 5rem minmax(0, 1fr);
-  }
-}
-
 @media (hover: hover) and (pointer: fine) {
   .mode-option:hover span,
   .radius-option:hover span,
-  .station-card__toggle:hover {
+  .station-list__tools button:hover {
     background: var(--road-800);
     color: var(--ink-100);
   }
@@ -1038,12 +979,8 @@ button {
     color: var(--road-975);
   }
 
-  .station-action--primary:hover {
+  .station-card__amap:hover {
     background: var(--route);
-  }
-
-  .station-action--secondary:hover {
-    background: var(--road-700);
   }
 
   .station-search__submit:hover {
@@ -1225,6 +1162,12 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .radar-sweep {
+    animation: none !important;
+    opacity: 0.35;
+    transform: rotate(0);
+  }
+
   *,
   *::before,
   *::after {

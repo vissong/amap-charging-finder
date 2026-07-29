@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ChargingStation } from "../../shared/contracts";
 import { StationList } from "../../src/components/StationList";
@@ -45,5 +46,31 @@ describe("StationList", () => {
 
     expect(screen.getByText("1+")).toBeVisible();
     expect(screen.getByTitle("结果已达到查询上限")).toBeVisible();
+  });
+
+  it("lets the user manually refresh loaded results", async () => {
+    const user = userEvent.setup();
+    const onRefresh = vi.fn();
+
+    render(
+      <StationList
+        mode="nearby"
+        items={[
+          {
+            station,
+            bearing: 0,
+            recommendationOrder: null,
+            serviceAreaMatch: null,
+          },
+        ]}
+        onRefresh={onRefresh}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "刷新充电站结果" }),
+    );
+
+    expect(onRefresh).toHaveBeenCalledOnce();
   });
 });

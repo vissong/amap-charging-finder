@@ -5,6 +5,7 @@ import type {
   ChargingStation,
   ListResponse,
   RoadContext,
+  SearchMode,
   SearchRadius,
   ServiceArea,
 } from "../../shared/contracts";
@@ -97,26 +98,26 @@ describe("search refresh policy", () => {
     timestamp: 1_000,
   };
 
-  it("refreshes for the first query, material movement, heading, time, mode, or radius", () => {
+  it("refreshes only for the first query or a changed radius", () => {
     expect(shouldRefreshSearch(null, anchor)).toBe(true);
     expect(
       shouldRefreshSearch(anchor, {
         ...anchor,
         location: { lng: 116.4, lat: 39.905 },
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldRefreshSearch(anchor, { ...anchor, heading: 20 }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldRefreshSearch(anchor, { ...anchor, timestamp: 31_000 }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldRefreshSearch(anchor, { ...anchor, radius: 20_000 }),
     ).toBe(true);
     expect(
       shouldRefreshSearch(anchor, { ...anchor, mode: "forward" }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("does not refresh for a small position and heading update", () => {
@@ -224,6 +225,48 @@ describe("useChargingSearch", () => {
     );
 
     expect(result.current.status).toBe("awaiting-direction");
+  });
+
+  it("reuses loaded stations when switching to forward mode", async () => {
+    let stationRequests = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === "/api/charging-stations") {
+        stationRequests += 1;
+        return json({
+          items: [ordinaryStation],
+          count: 1,
+        } satisfies ListResponse<ChargingStation>);
+      }
+      if (url.pathname === "/api/road-context") {
+        return json({
+          formattedAddress: "北京市中山路",
+          nearestRoad: "中山路",
+          roadDistanceMeters: 5,
+        } satisfies RoadContext);
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    };
+
+    const { result, rerender } = renderHook(
+      ({ mode }: { mode: SearchMode }) =>
+        useChargingSearch({
+          latest: currentSample,
+          motion: movingNorth,
+          mode,
+          radius: 10_000,
+          fetchImpl,
+        }),
+      { initialProps: { mode: "nearby" as SearchMode } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe("success"));
+    rerender({ mode: "forward" });
+
+    await waitFor(() =>
+      expect(result.current.ranked[0]?.station.id).toBe("ordinary"),
+    );
+    expect(stationRequests).toBe(1);
   });
 
   it("prevents an older response from replacing a newer radius query", async () => {

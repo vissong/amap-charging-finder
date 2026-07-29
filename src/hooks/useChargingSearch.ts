@@ -9,7 +9,6 @@ import type {
   SearchRadius,
   ServiceArea,
 } from "../../shared/contracts";
-import { haversineMeters, smallestAngleDifference } from "../../shared/geo";
 import { classifyHighway } from "../../shared/highway";
 import type {
   MotionSnapshot,
@@ -40,18 +39,7 @@ export function shouldRefreshSearch(
   next: SearchAnchor,
 ): boolean {
   if (!previous) return true;
-  if (previous.mode !== next.mode || previous.radius !== next.radius) {
-    return true;
-  }
-  if (haversineMeters(previous.location, next.location) >= 500) return true;
-  if (
-    previous.heading !== null &&
-    next.heading !== null &&
-    smallestAngleDifference(previous.heading, next.heading) >= 20
-  ) {
-    return true;
-  }
-  return next.timestamp - previous.timestamp >= 30_000;
+  return previous.radius !== next.radius;
 }
 
 export type ChargingSearchStatus =
@@ -153,7 +141,34 @@ export function useChargingSearch({
       mode,
       timestamp: latest.timestamp,
     };
-    if (!shouldRefreshSearch(anchorRef.current, nextAnchor)) return;
+    if (!shouldRefreshSearch(anchorRef.current, nextAnchor)) {
+      setState((previous) => {
+        if (
+          previous.status === "loading" ||
+          previous.status === "error"
+        ) {
+          return previous;
+        }
+        const ranked =
+          mode === "forward" && motion.heading !== null
+            ? rankRecommendations({
+                current: latest.location,
+                heading: motion.heading,
+                highwayState: previous.highwayState,
+                stations: previous.stations,
+                serviceAreas: previous.serviceAreas,
+              })
+            : [];
+        const resultCount =
+          mode === "forward" ? ranked.length : previous.stations.length;
+        return {
+          ...previous,
+          status: resultCount === 0 ? "empty" : "success",
+          ranked,
+        };
+      });
+      return;
+    }
     anchorRef.current = nextAnchor;
 
     controllerRef.current?.abort();

@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { ChargingStation } from "../../shared/contracts";
@@ -33,24 +32,20 @@ const station: ChargingStation = {
 };
 
 describe("StationCard", () => {
-  it("expands real POI details without inventing charging fields", async () => {
-    const user = userEvent.setup();
+  it("shows a direct AMap action without expandable details", () => {
     render(<StationCard station={station} />);
 
-    await user.click(
-      screen.getByRole("button", { name: "展开城市公共充电站详情" }),
-    );
-
-    expect(screen.getByText("汽车服务;充电站;充电站")).toBeVisible();
     expect(
-      screen.getByText("实时充电信息请前往高德地图查看"),
-    ).toBeVisible();
-    expect(screen.queryByText(/空闲枪|充电功率|电价/)).not.toBeInTheDocument();
+      screen.queryByRole("button", { name: /城市公共充电站详情/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("汽车服务;充电站;充电站")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: "站点图片" }),
     ).not.toBeInTheDocument();
 
-    const amapLink = screen.getByRole("link", { name: "在高德查看" });
+    const amapLink = screen.getByRole("link", {
+      name: "在高德查看城市公共充电站",
+    });
     expect(amapLink).toHaveAttribute("target", "_blank");
     expect(amapLink.getAttribute("href")).toContain("callnative=1");
   });

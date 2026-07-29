@@ -77,6 +77,24 @@ export function RoadRadar({
           前方
         </text>
 
+        <g
+          className="radar-sweep"
+          style={{ transformOrigin: `160px ${originY}px` }}
+          aria-hidden="true"
+        >
+          <path
+            className="radar-sweep__trail"
+            d={`M 160 ${originY} L 160 ${originY - 112} A 112 112 0 0 1 225.83 ${originY - 90.61} Z`}
+          />
+          <line
+            className="radar-sweep__beam"
+            x1="160"
+            y1={originY}
+            x2="160"
+            y2={originY - 112}
+          />
+        </g>
+
         {items.slice(0, 25).map((item, index) => {
           const point = markerPosition(
             item,

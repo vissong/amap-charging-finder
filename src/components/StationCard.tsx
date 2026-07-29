@@ -1,11 +1,7 @@
-import { useState } from "react";
 import {
-  ChevronDown,
   Clock3,
-  ExternalLink,
   MapPin,
   Navigation,
-  Phone,
   Route,
 } from "lucide-react";
 
@@ -27,12 +23,6 @@ function formatDistance(distanceMeters: number): string {
   return `${kilometers < 10 ? kilometers.toFixed(1) : Math.round(kilometers)} km`;
 }
 
-function coordinateLabel(
-  value: ChargingStation["entrance"],
-): string | null {
-  return value ? `${value.lng.toFixed(6)}, ${value.lat.toFixed(6)}` : null;
-}
-
 export function StationCard({
   station,
   serviceAreaMatch = null,
@@ -40,12 +30,11 @@ export function StationCard({
   directionLabel = null,
   showDistance = true,
 }: StationCardProps) {
-  const [expanded, setExpanded] = useState(false);
   const address = [station.district, station.address]
     .filter(Boolean)
     .join(" · ");
-  const entrance = coordinateLabel(station.entrance);
-  const exit = coordinateLabel(station.exit);
+  const amapHref = buildAmapMarkerUri(station);
+  const opensWebPage = amapHref.startsWith("https://");
 
   return (
     <article
@@ -101,89 +90,16 @@ export function StationCard({
           )}
         </div>
 
-        <button
-          className="station-card__toggle"
-          type="button"
-          aria-expanded={expanded}
-          aria-label={`${expanded ? "收起" : "展开"}${station.name}详情`}
-          onClick={() => setExpanded((value) => !value)}
+        <a
+          className="station-card__amap"
+          href={amapHref}
+          target={opensWebPage ? "_blank" : undefined}
+          rel={opensWebPage ? "noreferrer" : undefined}
+          aria-label={`在高德查看${station.name}`}
         >
-          <ChevronDown aria-hidden="true" size={22} />
-        </button>
-      </div>
-
-      <div className="station-card__reveal" data-expanded={expanded}>
-        <div className="station-card__details">
-          <dl className="poi-details">
-            {station.alias && (
-              <div>
-                <dt>别名</dt>
-                <dd>{station.alias}</dd>
-              </div>
-            )}
-            {station.type && (
-              <div>
-                <dt>高德分类</dt>
-                <dd>{station.type}</dd>
-              </div>
-            )}
-            {station.openingWeek && (
-              <div>
-                <dt>营业时间</dt>
-                <dd>{station.openingWeek}</dd>
-              </div>
-            )}
-            {entrance && (
-              <div>
-                <dt>入口坐标</dt>
-                <dd>{entrance}</dd>
-              </div>
-            )}
-            {exit && (
-              <div>
-                <dt>出口坐标</dt>
-                <dd>{exit}</dd>
-              </div>
-            )}
-          </dl>
-
-          {station.children.length > 0 && (
-            <div className="poi-children">
-              <span>关联地点</span>
-              <ul>
-                {station.children.map((child) => (
-                  <li key={child.id}>
-                    {child.name}
-                    {child.address ? ` · ${child.address}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <p className="data-boundary">
-            实时充电信息请前往高德地图查看
-          </p>
-
-          <div className="station-card__actions">
-            {station.phone && (
-              <a className="station-action station-action--secondary" href={`tel:${station.phone}`}>
-                <Phone aria-hidden="true" size={18} />
-                联系站点
-              </a>
-            )}
-            <a
-              className="station-action station-action--primary"
-              href={buildAmapMarkerUri(station)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Navigation aria-hidden="true" size={18} />
-              在高德查看
-              <ExternalLink aria-hidden="true" size={15} />
-            </a>
-          </div>
-        </div>
+          <Navigation aria-hidden="true" size={19} />
+          <span>高德</span>
+        </a>
       </div>
     </article>
   );
