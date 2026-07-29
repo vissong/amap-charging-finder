@@ -9,6 +9,7 @@ interface StationListProps {
   items: RadarItem[];
   truncated?: boolean;
   onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
 function directionLabel(bearing: number): string {
@@ -21,7 +22,11 @@ export function StationList({
   items,
   truncated = false,
   onRefresh,
+  refreshing = false,
 }: StationListProps) {
+  const visibleItems = items.slice(0, 50);
+  const hasMoreResults = truncated || items.length > visibleItems.length;
+
   return (
     <div className="station-list">
       <div className="station-list__heading">
@@ -30,15 +35,21 @@ export function StationList({
           <h2>{mode === "forward" ? "前方建议" : "附近站点"}</h2>
         </div>
         <div className="station-list__tools">
-          <strong title={truncated ? "结果已达到查询上限" : undefined}>
+          <strong title={hasMoreResults ? "结果已达到查询上限" : undefined}>
             <Navigation aria-hidden="true" size={16} />
-            {items.length}
-            {truncated ? "+" : ""}
+            {visibleItems.length}
+            {hasMoreResults ? "+" : ""}
           </strong>
           {onRefresh && (
             <button
               type="button"
-              aria-label="刷新充电站结果"
+              aria-label={
+                refreshing
+                  ? "正在刷新充电站结果"
+                  : "刷新充电站结果"
+              }
+              data-refreshing={refreshing}
+              disabled={refreshing}
               onClick={onRefresh}
             >
               <RefreshCw aria-hidden="true" size={17} />
@@ -47,7 +58,7 @@ export function StationList({
         </div>
       </div>
       <div className="station-list__items">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <StationCard
             key={item.station.id}
             station={item.station}

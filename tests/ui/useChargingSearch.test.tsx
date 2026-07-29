@@ -98,12 +98,12 @@ describe("search refresh policy", () => {
     timestamp: 1_000,
   };
 
-  it("refreshes only for the first query or a changed radius", () => {
+  it("refreshes for radius changes and each forward kilometer", () => {
     expect(shouldRefreshSearch(null, anchor)).toBe(true);
     expect(
       shouldRefreshSearch(anchor, {
         ...anchor,
-        location: { lng: 116.4, lat: 39.905 },
+        location: { lng: 116.4, lat: 39.92 },
       }),
     ).toBe(false);
     expect(
@@ -118,6 +118,20 @@ describe("search refresh policy", () => {
     expect(
       shouldRefreshSearch(anchor, { ...anchor, mode: "forward" }),
     ).toBe(false);
+
+    const forwardAnchor = { ...anchor, mode: "forward" as const };
+    expect(
+      shouldRefreshSearch(forwardAnchor, {
+        ...forwardAnchor,
+        location: { lng: 116.4, lat: 39.908 },
+      }),
+    ).toBe(false);
+    expect(
+      shouldRefreshSearch(forwardAnchor, {
+        ...forwardAnchor,
+        location: { lng: 116.4, lat: 39.91 },
+      }),
+    ).toBe(true);
   });
 
   it("does not refresh for a small position and heading update", () => {
@@ -249,24 +263,109 @@ describe("useChargingSearch", () => {
     };
 
     const { result, rerender } = renderHook(
-      ({ mode }: { mode: SearchMode }) =>
+      ({
+        mode,
+        latest,
+      }: {
+        mode: SearchMode;
+        latest: PositionSample;
+      }) =>
         useChargingSearch({
-          latest: currentSample,
+          latest,
           motion: movingNorth,
           mode,
           radius: 10_000,
           fetchImpl,
         }),
-      { initialProps: { mode: "nearby" as SearchMode } },
+      {
+        initialProps: {
+          mode: "nearby" as SearchMode,
+          latest: currentSample,
+        },
+      },
     );
 
     await waitFor(() => expect(result.current.status).toBe("success"));
-    rerender({ mode: "forward" });
+    rerender({ mode: "forward", latest: currentSample });
 
     await waitFor(() =>
       expect(result.current.ranked[0]?.station.id).toBe("ordinary"),
     );
     expect(stationRequests).toBe(1);
+
+    rerender({
+      mode: "forward",
+      latest: {
+        ...currentSample,
+        timestamp: 20_000,
+        location: { lng: 116.4, lat: 39.91 },
+      },
+    });
+
+    await waitFor(() => expect(stationRequests).toBe(2));
+  });
+
+  it("keeps loaded stations visible during a background refresh", async () => {
+    let resolveRefresh: ((response: Response) => void) | null = null;
+    const refreshResponse = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refreshedStation = station(
+      "refreshed",
+      "刷新后的充电站",
+      39.91,
+      1_100,
+    );
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === "/api/road-context") {
+        return json({
+          formattedAddress: "北京市中山路",
+          nearestRoad: "中山路",
+          roadDistanceMeters: 5,
+        } satisfies RoadContext);
+      }
+      if (url.searchParams.get("radius") === "20000") {
+        return refreshResponse;
+      }
+      return json({
+        items: [ordinaryStation],
+        count: 1,
+      } satisfies ListResponse<ChargingStation>);
+    };
+
+    const { result, rerender } = renderHook(
+      ({ radius }: { radius: SearchRadius }) =>
+        useChargingSearch({
+          latest: currentSample,
+          motion: movingNorth,
+          mode: "nearby",
+          radius,
+          fetchImpl,
+        }),
+      { initialProps: { radius: 10_000 as SearchRadius } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe("success"));
+    rerender({ radius: 20_000 });
+
+    await waitFor(() => expect(result.current.refreshing).toBe(true));
+    expect(result.current.status).toBe("success");
+    expect(result.current.stations[0].id).toBe("ordinary");
+
+    act(() => {
+      resolveRefresh?.(
+        json({
+          items: [refreshedStation],
+          count: 1,
+        } satisfies ListResponse<ChargingStation>),
+      );
+    });
+
+    await waitFor(() =>
+      expect(result.current.stations[0].id).toBe("refreshed"),
+    );
+    expect(result.current.refreshing).toBe(false);
   });
 
   it("prevents an older response from replacing a newer radius query", async () => {

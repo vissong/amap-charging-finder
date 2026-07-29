@@ -710,6 +710,15 @@ button {
   transform: scale(0.96);
 }
 
+.station-list__tools button:disabled {
+  color: var(--route);
+  cursor: wait;
+}
+
+.station-list__tools button[data-refreshing="true"] svg {
+  animation: refresh-spin 900ms linear infinite;
+}
+
 .station-list__items {
   display: grid;
 }
@@ -954,6 +963,12 @@ button {
   }
   to {
     transform: rotate(24deg);
+  }
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

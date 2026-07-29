@@ -9,6 +9,7 @@ import type {
   SearchRadius,
   ServiceArea,
 } from "../../shared/contracts";
+import { haversineMeters } from "../../shared/geo";
 import { classifyHighway } from "../../shared/highway";
 import type {
   MotionSnapshot,
@@ -39,7 +40,12 @@ export function shouldRefreshSearch(
   next: SearchAnchor,
 ): boolean {
   if (!previous) return true;
-  return previous.radius !== next.radius;
+  if (previous.radius !== next.radius) return true;
+  return (
+    previous.mode === "forward" &&
+    next.mode === "forward" &&
+    haversineMeters(previous.location, next.location) >= 1_000
+  );
 }
 
 export type ChargingSearchStatus =
@@ -58,6 +64,7 @@ export interface ChargingSearchState {
   roadContext: RoadContext | null;
   highwayState: HighwayState;
   truncated: boolean;
+  refreshing: boolean;
   error: { code: ApiErrorCode; message: string } | null;
   retry: () => void;
 }
@@ -77,6 +84,7 @@ const emptyState: Omit<ChargingSearchState, "status" | "retry"> = {
   roadContext: null,
   highwayState: "normal",
   truncated: false,
+  refreshing: false,
   error: null,
 };
 
@@ -142,6 +150,9 @@ export function useChargingSearch({
       timestamp: latest.timestamp,
     };
     if (!shouldRefreshSearch(anchorRef.current, nextAnchor)) {
+      if (anchorRef.current?.mode !== nextAnchor.mode) {
+        anchorRef.current = nextAnchor;
+      }
       setState((previous) => {
         if (
           previous.status === "loading" ||
@@ -176,7 +187,15 @@ export function useChargingSearch({
     controllerRef.current = controller;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    setState((previous) => ({ ...previous, status: "loading", error: null }));
+    setState((previous) => {
+      const keepLoadedResults = previous.stations.length > 0;
+      return {
+        ...previous,
+        status: keepLoadedResults ? previous.status : "loading",
+        refreshing: keepLoadedResults,
+        error: null,
+      };
+    });
 
     const options = { signal: controller.signal, fetchImpl };
     Promise.all([
@@ -220,6 +239,7 @@ export function useChargingSearch({
           roadContext,
           highwayState,
           truncated: stationResponse.truncated ?? false,
+          refreshing: false,
           error: null,
         });
       })
@@ -239,7 +259,9 @@ export function useChargingSearch({
               );
         setState((previous) => ({
           ...previous,
-          status: "error",
+          status:
+            previous.stations.length > 0 ? previous.status : "error",
+          refreshing: false,
           error: { code: apiError.code, message: apiError.message },
         }));
       });

@@ -73,4 +73,50 @@ describe("StationList", () => {
 
     expect(onRefresh).toHaveBeenCalledOnce();
   });
+
+  it("renders no more than 50 station entries", () => {
+    const items = Array.from({ length: 51 }, (_, index) => ({
+      station: {
+        ...station,
+        id: `station-${index + 1}`,
+        name: `测试充电站 ${index + 1}`,
+      },
+      bearing: 0,
+      recommendationOrder: null,
+      serviceAreaMatch: null,
+    }));
+
+    render(<StationList mode="nearby" items={items} />);
+
+    expect(screen.getAllByRole("link")).toHaveLength(50);
+    expect(screen.getByText("50+")).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "测试充电站 51" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks a background refresh without hiding loaded stations", () => {
+    render(
+      <StationList
+        mode="nearby"
+        items={[
+          {
+            station,
+            bearing: 0,
+            recommendationOrder: null,
+            serviceAreaMatch: null,
+          },
+        ]}
+        onRefresh={() => {}}
+        refreshing
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "测试充电站" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "正在刷新充电站结果" }),
+    ).toBeDisabled();
+  });
 });

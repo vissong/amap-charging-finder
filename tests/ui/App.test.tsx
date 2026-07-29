@@ -120,6 +120,23 @@ function emitPosition(): void {
 }
 
 describe("App", () => {
+  it("uses 3 km nearby and switches to the 5 km forward default", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(
+      screen.getByRole("radio", { name: "3 km" }),
+    ).toBeChecked();
+
+    await user.click(
+      screen.getByRole("radio", { name: "前方推荐" }),
+    );
+
+    expect(
+      screen.getByRole("radio", { name: "5 km" }),
+    ).toBeChecked();
+  });
+
   it("loads nearby real stations and exposes a relative radar", async () => {
     render(<App />);
 

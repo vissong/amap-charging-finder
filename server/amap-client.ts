@@ -180,7 +180,7 @@ export function createAmapClient({
 
   return {
     searchChargingStations(query) {
-      return searchNearbyPages(query, "011100", 8);
+      return searchNearbyPages(query, "011100", 2);
     },
     searchChargingStationsByKeyword(keywords) {
       return request("/v5/place/text", {
