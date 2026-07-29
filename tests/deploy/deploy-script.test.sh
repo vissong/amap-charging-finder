@@ -232,6 +232,7 @@ for invalid_ip in \
   "999.1.1.1" \
   "01.2.3.4" \
   "2001:::10" \
+  "1:2:3:4:5:6:7:8:" \
   "2001:db8::10/64"; do
   printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=%s\n' \
     "$invalid_ip" >"$case_dir/.env"

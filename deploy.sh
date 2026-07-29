@@ -86,6 +86,7 @@ valid_ipv6() {
     return
   fi
 
+  [[ "$value" != :* && "$value" != *: ]] || return 1
   IFS=':' read -r -a segments <<<"$value"
   (( ${#segments[@]} == 8 )) || return 1
   for segment in "${segments[@]}"; do
