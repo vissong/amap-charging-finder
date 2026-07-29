@@ -1,7 +1,10 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import type { AmapClient } from "../../server/amap-client";
+import {
+  AmapUpstreamError,
+  type AmapClient,
+} from "../../server/amap-client";
 import { createApp } from "../../server/app";
 import {
   amapRoadContextResponse,
@@ -145,5 +148,27 @@ describe("API routes", () => {
       },
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("returns a safe actionable message for an AMap IP whitelist error", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => {
+        throw new AmapUpstreamError("INVALID_USER_IP", "10005");
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+    );
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      error: {
+        code: "AMAP_UPSTREAM_ERROR",
+        message: "服务器公网 IP 未加入高德 Key 白名单",
+        upstreamCode: "10005",
+      },
+    });
+    expect(JSON.stringify(response.body)).not.toContain("INVALID_USER_IP");
   });
 });

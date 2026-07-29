@@ -97,6 +97,7 @@ describe("AMap HTTP client", () => {
     const client = createAmapClient({
       key: "server-only-key",
       fetchImpl,
+      sleepImpl: async () => {},
     });
 
     const response = (await client.searchChargingStations({
@@ -126,6 +127,7 @@ describe("AMap HTTP client", () => {
     const client = createAmapClient({
       key: "server-only-key",
       fetchImpl,
+      sleepImpl: async () => {},
     });
 
     const response = (await client.searchChargingStations({
@@ -136,6 +138,91 @@ describe("AMap HTTP client", () => {
 
     expect(requestedPages).toEqual([1, 2]);
     expect(response.pois).toHaveLength(27);
+  });
+
+  it("keeps successful nearby pages when a later page is rate limited", async () => {
+    const requestedPages: number[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      const pageNumber = Number(
+        new URL(String(input)).searchParams.get("page_num"),
+      );
+      requestedPages.push(pageNumber);
+      if (pageNumber === 2) {
+        return new Response(
+          JSON.stringify({
+            status: "0",
+            info: "CUQPS_HAS_EXCEEDED_THE_LIMIT",
+            infocode: "10021",
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          ...poiPage(pageNumber, 25),
+          count: "200",
+        }),
+        { status: 200 },
+      );
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+      sleepImpl: async () => {},
+    });
+
+    const response = (await client.searchChargingStations({
+      lng: 116.4,
+      lat: 39.9,
+      radius: 3_000,
+    })) as { pois: unknown[]; truncated: boolean };
+
+    expect(requestedPages).toEqual([1, 2, 2]);
+    expect(response.pois).toHaveLength(25);
+    expect(response.truncated).toBe(true);
+  });
+
+  it("backs off once and recovers a rate-limited nearby page", async () => {
+    const requestedPages: number[] = [];
+    const sleepDurations: number[] = [];
+    let pageTwoAttempts = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      const pageNumber = Number(
+        new URL(String(input)).searchParams.get("page_num"),
+      );
+      requestedPages.push(pageNumber);
+      if (pageNumber === 2 && pageTwoAttempts++ === 0) {
+        return new Response(
+          JSON.stringify({
+            status: "0",
+            info: "CUQPS_HAS_EXCEEDED_THE_LIMIT",
+            infocode: "10021",
+          }),
+        );
+      }
+      const count = pageNumber === 1 ? 25 : 2;
+      return new Response(
+        JSON.stringify(poiPage(pageNumber, count)),
+        { status: 200 },
+      );
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+      sleepImpl: async (milliseconds) => {
+        sleepDurations.push(milliseconds);
+      },
+    });
+
+    const response = (await client.searchChargingStations({
+      lng: 116.4,
+      lat: 39.9,
+      radius: 3_000,
+    })) as { pois: unknown[]; truncated: boolean };
+
+    expect(requestedPages).toEqual([1, 2, 2]);
+    expect(sleepDurations).toEqual([400, 1_000]);
+    expect(response.pois).toHaveLength(27);
+    expect(response.truncated).toBe(false);
   });
 
   it("searches charging stations nationwide with a qualified keyword", async () => {

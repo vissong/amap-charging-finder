@@ -24,10 +24,17 @@ export class AmapUpstreamError extends Error {
 interface CreateAmapClientOptions {
   key: string;
   fetchImpl?: typeof fetch;
+  sleepImpl?: (milliseconds: number) => Promise<void>;
 }
+
+const rateLimitInfocodes = new Set(["10021", "10029"]);
 
 function location({ lng, lat }: Coordinates): string {
   return `${lng.toFixed(6)},${lat.toFixed(6)}`;
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function upstreamStatus(payload: unknown): {
@@ -49,6 +56,7 @@ function upstreamStatus(payload: unknown): {
 export function createAmapClient({
   key,
   fetchImpl = fetch,
+  sleepImpl = sleep,
 }: CreateAmapClientOptions): AmapClient {
   async function request(
     pathname: string,
@@ -115,7 +123,35 @@ export function createAmapClient({
     const pois: unknown[] = [];
 
     for (let pageNumber = 1; pageNumber <= maximumPages; pageNumber += 1) {
-      const payload = await searchNearbyPage(query, typecode, pageNumber);
+      if (pageNumber > 1) {
+        await sleepImpl(400);
+      }
+
+      let payload: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          payload = await searchNearbyPage(query, typecode, pageNumber);
+          break;
+        } catch (error) {
+          if (
+            attempt === 0 &&
+            error instanceof AmapUpstreamError &&
+            error.infocode !== null &&
+            rateLimitInfocodes.has(error.infocode)
+          ) {
+            await sleepImpl(1_000);
+            continue;
+          }
+          if (firstPayload && pois.length > 0) {
+            return {
+              ...firstPayload,
+              pois,
+              truncated: true,
+            };
+          }
+          throw error;
+        }
+      }
       const source =
         payload !== null && typeof payload === "object"
           ? (payload as Record<string, unknown>)
