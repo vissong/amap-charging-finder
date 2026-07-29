@@ -24,7 +24,7 @@ import "./styles.css";
 
 export function App() {
   const [mode, setMode] = useState<SearchMode>("nearby");
-  const [radius, setRadius] = useState<SearchRadius>(10_000);
+  const [radius, setRadius] = useState<SearchRadius>(3_000);
   const tracker = useDriveTracker();
   const keywordSearch = useStationKeywordSearch();
   const search = useChargingSearch({
@@ -73,6 +73,10 @@ export function App() {
     tracker.status === "ready" &&
     radarItems.length > 0;
   const keywordSearchActive = keywordSearch.status !== "idle";
+  const handleModeChange = (nextMode: SearchMode) => {
+    setMode(nextMode);
+    setRadius(nextMode === "nearby" ? 3_000 : 5_000);
+  };
 
   return (
     <div className="app-shell">
@@ -117,7 +121,7 @@ export function App() {
             <ModeControls
               mode={mode}
               radius={radius}
-              onModeChange={setMode}
+              onModeChange={handleModeChange}
               onRadiusChange={setRadius}
             />
             <RoadRadar
@@ -142,6 +146,7 @@ export function App() {
               items={radarItems}
               truncated={search.truncated}
               onRefresh={search.retry}
+              refreshing={search.refreshing}
             />
           ) : (
             <StateMessage

@@ -1,7 +1,7 @@
 import {
+  Compass,
   Gauge,
   LocateFixed,
-  RadioTower,
   Route,
 } from "lucide-react";
 
@@ -34,6 +34,24 @@ const highwayLabels: Record<HighwayState, string> = {
   possible: "可能在高速",
   confirmed: "已识别高速",
 };
+
+function headingLabel(heading: number | null): string {
+  if (heading === null) return "等待方向";
+
+  const degrees = ((Math.round(heading) % 360) + 360) % 360;
+  const directions = [
+    "北",
+    "东北",
+    "东",
+    "东南",
+    "南",
+    "西南",
+    "西",
+    "西北",
+  ];
+  const direction = directions[Math.round(degrees / 45) % directions.length];
+  return `${direction} ${degrees}°`;
+}
 
 export function StatusBar({
   trackerStatus,
@@ -75,9 +93,9 @@ export function StatusBar({
       <div
         className={`status-cell status-cell--scene scene-${highwayState}`}
       >
-        <RadioTower aria-hidden="true" size={18} />
-        <span>场景</span>
-        <strong>{highwayLabels[highwayState]}</strong>
+        <Compass aria-hidden="true" size={18} />
+        <span>方向 · {highwayLabels[highwayState]}</span>
+        <strong>{headingLabel(motion.heading)}</strong>
         <small>{motion.phase === "moving" ? "行进中" : "当前静止"}</small>
       </div>
     </section>

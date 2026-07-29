@@ -118,16 +118,12 @@ test("nearby stations stay distance-sorted and expose the AMap URI", async (
     });
   }
 
-  await page
-    .getByRole("button", { name: "展开城市公共充电站详情" })
-    .click();
   const amapLink = page
     .getByRole("article")
     .filter({ hasText: "城市公共充电站" })
-    .getByRole("link", { name: "在高德查看" });
+    .getByRole("link", { name: "在高德查看城市公共充电站" });
   await expect(amapLink).toHaveAttribute("href", /callnative=1/);
-  await expect(amapLink).toHaveAttribute("href", /coordinate=gaode/);
-  await expect(amapLink).toHaveAttribute("href", /116\.4%2C39\.905/);
+  await expect(amapLink).toHaveAttribute("href", /poiid=ordinary/);
 });
 
 test("a moving highway session prioritizes the forward service-area station", async ({

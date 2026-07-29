@@ -79,7 +79,7 @@ describe("AMap HTTP client", () => {
     expect(new URL(requestedUrl).searchParams.get("types")).toBe("180300");
   });
 
-  it("collects up to 200 nearby stations across eight pages", async () => {
+  it("collects at most 50 nearby stations across two pages", async () => {
     const requestedPages: number[] = [];
     const fetchImpl: typeof fetch = async (input) => {
       const pageNumber = Number(
@@ -106,8 +106,8 @@ describe("AMap HTTP client", () => {
       radius: 10_000,
     })) as { pois: unknown[]; truncated: boolean };
 
-    expect(requestedPages).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(response.pois).toHaveLength(200);
+    expect(requestedPages).toEqual([1, 2]);
+    expect(response.pois).toHaveLength(50);
     expect(response.truncated).toBe(true);
   });
 
