@@ -1,12 +1,27 @@
 import type { ChargingStation } from "./contracts";
 
-export function buildAmapMarkerUri(station: ChargingStation): string {
+function isMobileH5(userAgent: string): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
+}
+
+export function buildAmapMarkerUri(
+  station: ChargingStation,
+  userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent,
+): string {
+  if (isMobileH5(userAgent)) {
+    const search = new URLSearchParams({
+      poiname: station.name,
+      lat: String(station.location.lat),
+      lon: String(station.location.lng),
+      poiid: station.id,
+    });
+    return `amapuri://poi/detail?${search.toString()}`;
+  }
+
   const url = new URL("https://uri.amap.com/marker");
   url.search = new URLSearchParams({
-    position: `${station.location.lng},${station.location.lat}`,
-    name: station.name,
+    poiid: station.id,
     src: "amap-charging-finder",
-    coordinate: "gaode",
     callnative: "1",
   }).toString();
   return url.toString();
