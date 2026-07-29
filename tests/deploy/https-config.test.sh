@@ -4,16 +4,83 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
-services="$(
-  DOMAIN=charge.example.com \
-  ENV_FILE=tests/deploy/fixtures/valid.env \
-  docker compose --profile https config --services
-)"
-grep -Fx "app" <<<"$services"
-grep -Fx "caddy" <<<"$services"
+[[ -f "$root/Caddyfile.ip" ]] || {
+  echo "Caddyfile.ip must exist for public IP HTTPS" >&2
+  exit 1
+}
+
+validate_compose_config() {
+  local expected_host="$1"
+  local expected_ip="$2"
+  local expected_config="$3"
+
+  HTTPS_HOST="$expected_host" \
+    PUBLIC_IP="$expected_ip" \
+    CADDY_CONFIG_PATH="$expected_config" \
+    ENV_FILE=tests/deploy/fixtures/valid.env \
+    docker compose --profile https config --format json |
+    EXPECTED_HOST="$expected_host" \
+      EXPECTED_IP="$expected_ip" \
+      EXPECTED_CONFIG="$expected_config" \
+      node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        const config = JSON.parse(readFileSync(0, "utf8"));
+        const caddy = config.services.caddy;
+        if (!config.services.app || !caddy) {
+          throw new Error("https profile must include app and caddy");
+        }
+        if (caddy.environment.HTTPS_HOST !== process.env.EXPECTED_HOST) {
+          throw new Error("HTTPS_HOST was not passed to Caddy");
+        }
+        if (caddy.environment.PUBLIC_IP !== process.env.EXPECTED_IP) {
+          throw new Error("PUBLIC_IP was not passed to Caddy");
+        }
+        const caddyfile = caddy.volumes.find(
+          (volume) => volume.target === "/etc/caddy/Caddyfile"
+        );
+        if (caddyfile?.source !== process.env.EXPECTED_CONFIG) {
+          throw new Error("selected Caddyfile was not mounted");
+        }
+      '
+}
+
+validate_compose_config \
+  "charge.example.com" \
+  "" \
+  "$root/Caddyfile"
+validate_compose_config \
+  "203.0.113.10" \
+  "203.0.113.10" \
+  "$root/Caddyfile.ip"
 
 docker run --rm \
-  -e DOMAIN=charge.example.com \
+  -e HTTPS_HOST=charge.example.com \
   -v "$root/Caddyfile:/etc/caddy/Caddyfile:ro" \
   caddy:2-alpine \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+for ip_host in "203.0.113.10" "[2001:db8::10]"; do
+  docker run --rm \
+    -e HTTPS_HOST="$ip_host" \
+    -v "$root/Caddyfile.ip:/etc/caddy/Caddyfile:ro" \
+    caddy:2-alpine \
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+done
+
+docker run --rm \
+  -e HTTPS_HOST=203.0.113.10 \
+  -v "$root/Caddyfile.ip:/etc/caddy/Caddyfile:ro" \
+  caddy:2-alpine \
+  caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile |
+  node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    const config = JSON.parse(readFileSync(0, "utf8"));
+    const policy = config.apps?.tls?.automation?.policies?.[0];
+    const issuer = policy?.issuers?.[0];
+    if (issuer?.module !== "acme" || issuer?.profile !== "shortlived") {
+      throw new Error("public IP certificates must use ACME shortlived");
+    }
+    if (!policy.subjects?.includes("203.0.113.10")) {
+      throw new Error("public IP must be the certificate subject");
+    }
+  '
