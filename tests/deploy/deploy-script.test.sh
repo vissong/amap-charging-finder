@@ -25,10 +25,13 @@ set -euo pipefail
 printf '%s\n' "$*" >>"$DOCKER_CALLS"
 
 if [[ "${1:-}" == "compose" ]]; then
-  printf 'ENV_FILE=%s|APP_PORT=%s|DOMAIN=%s|COMPOSE_FILE=%s|COMPOSE_PROFILES=%s|CALL=%s\n' \
+  printf 'ENV_FILE=%s|APP_PORT=%s|DOMAIN=%s|PUBLIC_IP=%s|HTTPS_HOST=%s|CADDY_CONFIG_PATH=%s|COMPOSE_FILE=%s|COMPOSE_PROFILES=%s|CALL=%s\n' \
     "${ENV_FILE-<unset>}" \
     "${APP_PORT-<unset>}" \
     "${DOMAIN-<unset>}" \
+    "${PUBLIC_IP-<unset>}" \
+    "${HTTPS_HOST-<unset>}" \
+    "${CADDY_CONFIG_PATH-<unset>}" \
     "${COMPOSE_FILE-<unset>}" \
     "${COMPOSE_PROFILES-<unset>}" \
     "$*" >>"$COMPOSE_ENV"
@@ -124,6 +127,9 @@ run_deploy_with_conflicting_env() {
       ENV_FILE="/tmp/inherited.env" \
       APP_PORT="65500" \
       DOMAIN="inherited.example.net" \
+      PUBLIC_IP="198.51.100.99" \
+      HTTPS_HOST="inherited.example.net" \
+      CADDY_CONFIG_PATH="/tmp/inherited.Caddyfile" \
       COMPOSE_FILE="/tmp/inherited-compose.yaml" \
       COMPOSE_PROFILES="https" \
       ./deploy.sh
@@ -162,10 +168,11 @@ if run_deploy; then
 fi
 grep -F "APP_PORT" "$output"
 
-# Valid IP deployment
-printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' >"$case_dir/.env"
+# Valid plain HTTP deployment
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=\n' \
+  >"$case_dir/.env"
 run_deploy || {
-  echo "valid IP deployment failed unexpectedly" >&2
+  echo "valid plain HTTP deployment failed unexpectedly" >&2
   sed -n '1,120p' "$output" >&2
   exit 1
 }
@@ -187,9 +194,56 @@ printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=charge.example.c
 run_deploy
 grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
 grep -F "https://charge.example.com" "$output"
+grep -F "|PUBLIC_IP=|HTTPS_HOST=charge.example.com|CADDY_CONFIG_PATH=$case_dir/Caddyfile|" \
+  "$compose_env"
+
+# Public IPv4 deployment enables HTTPS with the short-lived certificate config.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=203.0.113.10\n' \
+  >"$case_dir/.env"
+run_deploy
+grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
+grep -F "https://203.0.113.10" "$output"
+grep -F "|PUBLIC_IP=203.0.113.10|HTTPS_HOST=203.0.113.10|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
+  "$compose_env"
+
+# Public IPv6 deployment enables HTTPS and prints a bracketed URL.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=2001:db8::10\n' \
+  >"$case_dir/.env"
+run_deploy
+grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
+grep -F "https://[2001:db8::10]" "$output"
+grep -F "|PUBLIC_IP=2001:db8::10|HTTPS_HOST=[2001:db8::10]|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
+  "$compose_env"
+
+# Domain and public IP cannot select two certificate identities at once.
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=charge.example.com\nPUBLIC_IP=203.0.113.10\n' \
+  >"$case_dir/.env"
+if run_deploy; then
+  echo "DOMAIN and PUBLIC_IP conflict must fail" >&2
+  exit 1
+fi
+grep -F "DOMAIN" "$output"
+grep -F "PUBLIC_IP" "$output"
+! grep -F "compose " "$calls"
+
+# Schemes, malformed IPv4, and malformed IPv6 are rejected.
+for invalid_ip in \
+  "https://203.0.113.10" \
+  "999.1.1.1" \
+  "01.2.3.4" \
+  "2001:::10" \
+  "2001:db8::10/64"; do
+  printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=%s\n' \
+    "$invalid_ip" >"$case_dir/.env"
+  if run_deploy; then
+    printf 'invalid PUBLIC_IP was accepted: %s\n' "$invalid_ip" >&2
+    exit 1
+  fi
+  grep -F "PUBLIC_IP" "$output"
+done
 
 # Removing DOMAIN stops the old optional proxy without deleting named volumes.
-printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' \
+printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=\n' \
   >"$case_dir/.env"
 run_deploy
 grep -E '^compose .*--profile https .*rm --stop --force caddy$' "$calls"
@@ -206,11 +260,11 @@ grep -F "DOMAIN" "$output"
 if [[ "${DEPLOY_TEST_CASE:-all}" == "all" ||
   "${DEPLOY_TEST_CASE:-all}" == "inherited-environment" ]]; then
   # Conflicting inherited values cannot override the repository configuration.
-  printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' \
+  printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=\n' \
     >"$case_dir/.env"
   run_deploy_with_conflicting_env
   [[ -s "$compose_env" ]]
-  expected_prefix="ENV_FILE=$case_dir/.env|APP_PORT=3100|DOMAIN=|COMPOSE_FILE=<unset>|COMPOSE_PROFILES=<unset>|CALL="
+  expected_prefix="ENV_FILE=$case_dir/.env|APP_PORT=3100|DOMAIN=|PUBLIC_IP=|HTTPS_HOST=|CADDY_CONFIG_PATH=$case_dir/Caddyfile|COMPOSE_FILE=<unset>|COMPOSE_PROFILES=<unset>|CALL="
   while IFS= read -r recorded_environment; do
     [[ "$recorded_environment" == "$expected_prefix"* ]] || {
       printf 'compose received inherited environment: %s\n' \
@@ -228,7 +282,7 @@ fi
 if [[ "${DEPLOY_TEST_CASE:-all}" == "all" ||
   "${DEPLOY_TEST_CASE:-all}" == "caddy-removal-failure" ]]; then
   # A real Caddy removal failure aborts before updating the application.
-  printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\n' \
+  printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=\n' \
     >"$case_dir/.env"
   if FAIL_CADDY_RM=1 run_deploy; then
     echo "caddy removal failure must fail deployment" >&2

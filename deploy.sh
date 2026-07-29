@@ -48,6 +48,51 @@ valid_domain() {
   done
 }
 
+valid_ipv4() {
+  local value="$1"
+  local octet
+  local octets=()
+
+  [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS='.' read -r -a octets <<<"$value"
+  for octet in "${octets[@]}"; do
+    [[ "$octet" == "0" || "$octet" != 0* ]] || return 1
+    (( 10#$octet <= 255 )) || return 1
+  done
+}
+
+valid_ipv6() {
+  local value="$1"
+  local left right side segment
+  local segments=()
+  local count=0
+
+  [[ "$value" == *:* && "$value" =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+  [[ "$value" != *":::"* ]] || return 1
+
+  if [[ "$value" == *"::"* ]]; then
+    left="${value%%::*}"
+    right="${value#*::}"
+    [[ "$right" != *"::"* ]] || return 1
+    for side in "$left" "$right"; do
+      [[ -n "$side" ]] || continue
+      IFS=':' read -r -a segments <<<"$side"
+      for segment in "${segments[@]}"; do
+        [[ "$segment" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+        (( count += 1 ))
+      done
+    done
+    (( count < 8 ))
+    return
+  fi
+
+  IFS=':' read -r -a segments <<<"$value"
+  (( ${#segments[@]} == 8 )) || return 1
+  for segment in "${segments[@]}"; do
+    [[ "$segment" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+  done
+}
+
 [[ -f compose.yaml ]] || fail "当前目录缺少 compose.yaml"
 command -v docker >/dev/null 2>&1 || fail "未安装 Docker"
 docker info >/dev/null 2>&1 || fail "Docker 服务不可用"
@@ -67,8 +112,31 @@ esac
   fail "APP_PORT 必须是 1 至 65535 的整数"
 
 domain="$(read_env_value DOMAIN)"
+public_ip="$(read_env_value PUBLIC_IP)"
+if [[ -n "$domain" && -n "$public_ip" ]]; then
+  fail "DOMAIN 与 PUBLIC_IP 只能配置一个"
+fi
 if [[ -n "$domain" ]] && ! valid_domain "$domain"; then
   fail "DOMAIN 必须是纯域名，不能包含 http://、端口或路径"
+fi
+if [[ -n "$public_ip" ]] &&
+  ! valid_ipv4 "$public_ip" &&
+  ! valid_ipv6 "$public_ip"; then
+  fail "PUBLIC_IP 必须是纯 IPv4 或 IPv6 地址，不能包含协议、端口或路径"
+fi
+
+https_host="$domain"
+https_url_host="$domain"
+caddy_config_path="$root/Caddyfile"
+if [[ -n "$public_ip" ]]; then
+  caddy_config_path="$root/Caddyfile.ip"
+  if valid_ipv6 "$public_ip"; then
+    https_host="[$public_ip]"
+    https_url_host="[$public_ip]"
+  else
+    https_host="$public_ip"
+    https_url_host="$public_ip"
+  fi
 fi
 
 run_compose() {
@@ -77,6 +145,9 @@ run_compose() {
     export ENV_FILE="$root/.env"
     export APP_PORT="$app_port"
     export DOMAIN="$domain"
+    export PUBLIC_IP="$public_ip"
+    export HTTPS_HOST="$https_host"
+    export CADDY_CONFIG_PATH="$caddy_config_path"
     docker compose \
       --file "$root/compose.yaml" \
       --env-file "$root/.env" \
@@ -87,14 +158,14 @@ run_compose() {
 run_compose version >/dev/null 2>&1 || fail "Docker Compose 不可用"
 
 run_selected_compose() {
-  if [[ -n "$domain" ]]; then
+  if [[ -n "$https_host" ]]; then
     run_compose --profile https "$@"
   else
     run_compose "$@"
   fi
 }
 
-if [[ -z "$domain" ]]; then
+if [[ -z "$https_host" ]]; then
   run_compose --profile https rm --stop --force caddy >/dev/null 2>&1 ||
     fail "停止旧 Caddy 服务失败"
 fi
@@ -122,7 +193,10 @@ done
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 server_ip="${server_ip:-<服务器IP>}"
 printf '部署成功： http://%s:%s\n' "$server_ip" "$app_port"
-if [[ -n "$domain" ]]; then
-  printf 'HTTPS 地址： https://%s\n' "$domain"
+if [[ -n "$https_host" ]]; then
+  printf 'HTTPS 地址： https://%s\n' "$https_url_host"
+  if [[ -n "$public_ip" ]]; then
+    printf 'IP 证书： Let'\''s Encrypt shortlived，Caddy 自动续期\n'
+  fi
   printf '证书状态： docker compose --profile https logs caddy\n'
 fi
