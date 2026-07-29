@@ -28,13 +28,14 @@ services:
       start_period: 10s
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11-alpine
     profiles:
       - https
     environment:
       DOMAIN: "${DOMAIN:-}"
       PUBLIC_IP: "${PUBLIC_IP:-}"
       HTTPS_HOST: "${HTTPS_HOST:-}"
+      TLS_SERVER_NAME: "${TLS_SERVER_NAME:-}"
     ports:
       - "80:80"
       - "443:443"

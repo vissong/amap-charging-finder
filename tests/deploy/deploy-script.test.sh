@@ -25,12 +25,13 @@ set -euo pipefail
 printf '%s\n' "$*" >>"$DOCKER_CALLS"
 
 if [[ "${1:-}" == "compose" ]]; then
-  printf 'ENV_FILE=%s|APP_PORT=%s|DOMAIN=%s|PUBLIC_IP=%s|HTTPS_HOST=%s|CADDY_CONFIG_PATH=%s|COMPOSE_FILE=%s|COMPOSE_PROFILES=%s|CALL=%s\n' \
+  printf 'ENV_FILE=%s|APP_PORT=%s|DOMAIN=%s|PUBLIC_IP=%s|HTTPS_HOST=%s|TLS_SERVER_NAME=%s|CADDY_CONFIG_PATH=%s|COMPOSE_FILE=%s|COMPOSE_PROFILES=%s|CALL=%s\n' \
     "${ENV_FILE-<unset>}" \
     "${APP_PORT-<unset>}" \
     "${DOMAIN-<unset>}" \
     "${PUBLIC_IP-<unset>}" \
     "${HTTPS_HOST-<unset>}" \
+    "${TLS_SERVER_NAME-<unset>}" \
     "${CADDY_CONFIG_PATH-<unset>}" \
     "${COMPOSE_FILE-<unset>}" \
     "${COMPOSE_PROFILES-<unset>}" \
@@ -52,6 +53,11 @@ fi
   if [[ "${1:-}" == "inspect" && "$*" == *"test-container" ]]; then
     assert_success_not_reported
     printf 'healthy\n'
+    exit 0
+  fi
+  if [[ "${1:-}" == "exec" && "$*" == "exec test-container wget --no-check-certificate -qO- https://127.0.0.1/api/health" ]]; then
+    assert_success_not_reported
+    printf '{"status":"ok"}\n'
     exit 0
   fi
   printf 'unexpected docker call: %s\n' "$*" >&2
@@ -129,6 +135,7 @@ run_deploy_with_conflicting_env() {
       DOMAIN="inherited.example.net" \
       PUBLIC_IP="198.51.100.99" \
       HTTPS_HOST="inherited.example.net" \
+      TLS_SERVER_NAME="inherited.example.net" \
       CADDY_CONFIG_PATH="/tmp/inherited.Caddyfile" \
       COMPOSE_FILE="/tmp/inherited-compose.yaml" \
       COMPOSE_PROFILES="https" \
@@ -194,7 +201,7 @@ printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=charge.example.c
 run_deploy
 grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
 grep -F "https://charge.example.com" "$output"
-grep -F "|PUBLIC_IP=|HTTPS_HOST=charge.example.com|CADDY_CONFIG_PATH=$case_dir/Caddyfile|" \
+grep -F "|PUBLIC_IP=|HTTPS_HOST=charge.example.com|TLS_SERVER_NAME=charge.example.com|CADDY_CONFIG_PATH=$case_dir/Caddyfile|" \
   "$compose_env"
 
 # Public IPv4 deployment enables HTTPS with the short-lived certificate config.
@@ -203,8 +210,10 @@ printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=203.
 run_deploy
 grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
 grep -F "https://203.0.113.10" "$output"
-grep -F "|PUBLIC_IP=203.0.113.10|HTTPS_HOST=203.0.113.10|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
+grep -F "|PUBLIC_IP=203.0.113.10|HTTPS_HOST=203.0.113.10|TLS_SERVER_NAME=203.0.113.10|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
   "$compose_env"
+grep -Fx "exec test-container wget --no-check-certificate -qO- https://127.0.0.1/api/health" \
+  "$calls"
 
 # Public IPv6 deployment enables HTTPS and prints a bracketed URL.
 printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=2001:db8::10\n' \
@@ -212,7 +221,7 @@ printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=2001
 run_deploy
 grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
 grep -F "https://[2001:db8::10]" "$output"
-grep -F "|PUBLIC_IP=2001:db8::10|HTTPS_HOST=[2001:db8::10]|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
+grep -F "|PUBLIC_IP=2001:db8::10|HTTPS_HOST=[2001:db8::10]|TLS_SERVER_NAME=2001:db8::10|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
   "$compose_env"
 
 # Domain and public IP cannot select two certificate identities at once.
@@ -265,7 +274,7 @@ if [[ "${DEPLOY_TEST_CASE:-all}" == "all" ||
     >"$case_dir/.env"
   run_deploy_with_conflicting_env
   [[ -s "$compose_env" ]]
-  expected_prefix="ENV_FILE=$case_dir/.env|APP_PORT=3100|DOMAIN=|PUBLIC_IP=|HTTPS_HOST=|CADDY_CONFIG_PATH=$case_dir/Caddyfile|COMPOSE_FILE=<unset>|COMPOSE_PROFILES=<unset>|CALL="
+  expected_prefix="ENV_FILE=$case_dir/.env|APP_PORT=3100|DOMAIN=|PUBLIC_IP=|HTTPS_HOST=|TLS_SERVER_NAME=|CADDY_CONFIG_PATH=$case_dir/Caddyfile|COMPOSE_FILE=<unset>|COMPOSE_PROFILES=<unset>|CALL="
   while IFS= read -r recorded_environment; do
     [[ "$recorded_environment" == "$expected_prefix"* ]] || {
       printf 'compose received inherited environment: %s\n' \

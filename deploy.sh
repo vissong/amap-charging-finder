@@ -128,8 +128,10 @@ fi
 
 https_host="$domain"
 https_url_host="$domain"
+tls_server_name="$domain"
 caddy_config_path="$root/Caddyfile"
 if [[ -n "$public_ip" ]]; then
+  tls_server_name="$public_ip"
   caddy_config_path="$root/Caddyfile.ip"
   if valid_ipv6 "$public_ip"; then
     https_host="[$public_ip]"
@@ -148,6 +150,7 @@ run_compose() {
     export DOMAIN="$domain"
     export PUBLIC_IP="$public_ip"
     export HTTPS_HOST="$https_host"
+    export TLS_SERVER_NAME="$tls_server_name"
     export CADDY_CONFIG_PATH="$caddy_config_path"
     docker compose \
       --file "$root/compose.yaml" \
@@ -190,6 +193,48 @@ done
 
 [[ "$health" == "healthy" ]] ||
   fail "应用健康检查超时，请运行 docker compose logs app"
+
+if [[ -n "$https_host" ]]; then
+  caddy_container_id="$(run_selected_compose ps -q caddy)"
+  [[ -n "$caddy_container_id" ]] || fail "Caddy 容器未创建"
+
+  https_ready=false
+  for _ in $(seq 1 30); do
+    caddy_status="$(
+      docker inspect \
+        --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+        "$caddy_container_id"
+    )"
+    [[ "$caddy_status" != "unhealthy" &&
+      "$caddy_status" != "exited" &&
+      "$caddy_status" != "dead" &&
+      "$caddy_status" != "restarting" ]] || {
+      run_selected_compose logs --tail=30 caddy >&2 || true
+      fail "Caddy 启动失败，请检查上方日志"
+    }
+
+    if [[ -n "$public_ip" ]]; then
+      https_health="$(
+        docker exec "$caddy_container_id" \
+          wget --no-check-certificate -qO- \
+          https://127.0.0.1/api/health 2>/dev/null || true
+      )"
+      if [[ "$https_health" == '{"status":"ok"}' ]]; then
+        https_ready=true
+        break
+      fi
+    elif [[ "$caddy_status" == "running" || "$caddy_status" == "healthy" ]]; then
+      https_ready=true
+      break
+    fi
+    sleep 2
+  done
+
+  if [[ "$https_ready" != true ]]; then
+    run_selected_compose logs --tail=30 caddy >&2 || true
+    fail "IP HTTPS 握手失败，请确认公网 80/443 端口已放行"
+  fi
+fi
 
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 server_ip="${server_ip:-<服务器IP>}"

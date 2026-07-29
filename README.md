@@ -97,6 +97,11 @@ PUBLIC_IP=
 
 公网 IP 证书由 Let’s Encrypt 的 `shortlived` profile 签发，支持 IPv4 和 IPv6，有效期约 160 小时，由 Caddy 自动续期。部署成功后可通过 `docker compose --profile https logs caddy` 查看签发和续期状态。
 
+云服务器的公网 IP 常通过 NAT 映射到实例内网地址。项目会把 `PUBLIC_IP`
+同时配置为 Caddy 的默认 SNI，保证浏览器访问裸 IP（ClientHello 不携带
+SNI）时仍能选中正确证书。部署脚本会在宣布成功前实际检查一次 IP HTTPS
+握手和应用健康接口。
+
 ### HTTPS 与定位权限
 
 有效且受浏览器信任的域名 HTTPS **不会妨碍定位**，而是移动浏览器开放 Geolocation API 所需的安全上下文。有效的公网 IP HTTPS 同样属于安全上下文。HTTP 公网 IP 通常只能使用名称搜索，“附近”和“前方推荐”会因定位 API 受限而不可用。
@@ -124,12 +129,27 @@ docker compose logs -f app
 # 查看 HTTPS 反向代理日志
 docker compose --profile https logs -f caddy
 
+# 确认使用支持公网 IP 证书的 Caddy 版本
+docker compose --profile https exec caddy caddy version
+
 # 停止服务，保留证书
 docker compose --profile https down
 
 # 仅在有意重置 HTTPS 时，删除容器和证书卷
 docker compose --profile https down -v
 ```
+
+如果浏览器提示 `ERR_SSL_PROTOCOL_ERROR`，先更新代码并重新部署：
+
+```bash
+git pull --ff-only
+docker compose --profile https pull caddy
+./deploy.sh
+```
+
+若部署脚本报告 IP HTTPS 握手失败，检查云安全组和系统防火墙是否同时放行
+TCP 80、TCP 443，并运行
+`docker compose --profile https logs --tail=100 caddy` 查看证书签发错误。
 
 ## 验证
 
