@@ -41,3 +41,16 @@ it("uses the AMap POI deep link on mobile H5 browsers", () => {
   expect(uri.searchParams.get("lon")).toBe("116.2468");
   expect(uri.searchParams.get("poiid")).toBe("B0G33X0XSK");
 });
+
+it("uses the AMap Web URI inside WeChat H5", () => {
+  const uri = new URL(
+    buildAmapMarkerUri(
+      station,
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.60",
+    ),
+  );
+
+  expect(uri.origin + uri.pathname).toBe("https://uri.amap.com/marker");
+  expect(uri.searchParams.get("poiid")).toBe("B0G33X0XSK");
+  expect(uri.searchParams.get("callnative")).toBe("1");
+});
