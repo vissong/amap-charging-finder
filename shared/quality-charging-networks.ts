@@ -39,7 +39,7 @@ export const QUALITY_CHARGING_NETWORK_BRANDS = [
   {
     id: "nio-power",
     label: "蔚来 NIO Power",
-    aliases: ["蔚来超充", "蔚来充电", "蔚来换电", "NIO Power"],
+    aliases: ["蔚来能源", "蔚来超充", "蔚来充电", "蔚来换电", "NIO Power"],
   },
   {
     id: "cams",

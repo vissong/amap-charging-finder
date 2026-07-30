@@ -43,6 +43,7 @@ describe("StationCard", () => {
     expect(
       screen.queryByRole("img", { name: "站点图片" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("充电站")).not.toBeInTheDocument();
 
     const amapLink = screen.getByRole("link", {
       name: "在高德查看城市公共充电站",

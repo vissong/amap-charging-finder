@@ -38,6 +38,11 @@ describe("quality charging network recognition", () => {
     expect(
       matchQualityChargingNetwork("BYD FLASH Charging 北京站"),
     ).toMatchObject({ label: "比亚迪闪充" });
+    expect(
+      matchQualityChargingNetwork(
+        "蔚来能源目的地充电站(内部使用北京腾讯总部大楼地下车库桩群二期)",
+      ),
+    ).toMatchObject({ label: "蔚来 NIO Power" });
     expect(matchQualityChargingNetwork("社区公共充电站")).toBeNull();
   });
 });
