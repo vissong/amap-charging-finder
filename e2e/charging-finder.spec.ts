@@ -207,3 +207,25 @@ test("the selected viewport has no horizontal page overflow", async ({
   );
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("the four driving status blocks stay on one compact row", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/");
+
+  const statusCells = page.locator(".status-bar .status-cell");
+  await expect(statusCells).toHaveCount(4);
+
+  const metrics = await statusCells.evaluateAll((cells) => {
+    const boxes = cells.map((cell) => cell.getBoundingClientRect());
+    const bar = cells[0]?.parentElement?.getBoundingClientRect();
+    return {
+      tops: boxes.map((box) => Math.round(box.top)),
+      barHeight: bar?.height ?? 0,
+    };
+  });
+
+  expect(new Set(metrics.tops).size).toBe(1);
+  expect(metrics.barHeight).toBeLessThanOrEqual(80);
+});
