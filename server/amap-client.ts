@@ -28,6 +28,7 @@ interface CreateAmapClientOptions {
 }
 
 const rateLimitInfocodes = new Set(["10021", "10029"]);
+const automotiveChargingTypes = "011100|011101|011102|011103";
 
 function location({ lng, lat }: Coordinates): string {
   return `${lng.toFixed(6)},${lat.toFixed(6)}`;
@@ -99,7 +100,7 @@ export function createAmapClient({
 
   function searchNearbyPage(
     query: NearbySearchQuery,
-    typecode: "011100" | "180300",
+    typecode: typeof automotiveChargingTypes | "180300",
     pageNumber: number,
   ): Promise<unknown> {
     return request("/v5/place/around", {
@@ -116,7 +117,7 @@ export function createAmapClient({
 
   async function searchNearbyPages(
     query: NearbySearchQuery,
-    typecode: "011100" | "180300",
+    typecode: typeof automotiveChargingTypes | "180300",
     maximumPages: number,
   ): Promise<unknown> {
     let firstPayload: Record<string, unknown> | null = null;
@@ -180,12 +181,12 @@ export function createAmapClient({
 
   return {
     searchChargingStations(query) {
-      return searchNearbyPages(query, "011100", 2);
+      return searchNearbyPages(query, automotiveChargingTypes, 2);
     },
     searchChargingStationsByKeyword(keywords) {
       return request("/v5/place/text", {
         keywords,
-        types: "011100",
+        types: automotiveChargingTypes,
         show_fields: "business,navi,children",
         page_size: "25",
         page_num: "1",

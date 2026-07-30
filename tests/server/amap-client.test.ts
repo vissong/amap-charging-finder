@@ -46,7 +46,9 @@ describe("AMap HTTP client", () => {
     expect(parsedUrl.searchParams.get("location")).toBe(
       "116.397499,39.908722",
     );
-    expect(parsedUrl.searchParams.get("types")).toBe("011100");
+    expect(parsedUrl.searchParams.get("types")).toBe(
+      "011100|011101|011102|011103",
+    );
     expect(parsedUrl.searchParams.get("show_fields")).toBe(
       "business,navi,children",
     );
@@ -248,7 +250,9 @@ describe("AMap HTTP client", () => {
     expect(parsedUrl.searchParams.get("keywords")).toBe(
       "孟村服务区 充电站",
     );
-    expect(parsedUrl.searchParams.get("types")).toBe("011100");
+    expect(parsedUrl.searchParams.get("types")).toBe(
+      "011100|011101|011102|011103",
+    );
     expect(parsedUrl.searchParams.has("region")).toBe(false);
     expect(parsedUrl.searchParams.get("show_fields")).toBe(
       "business,navi,children",

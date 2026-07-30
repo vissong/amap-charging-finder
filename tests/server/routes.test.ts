@@ -24,6 +24,22 @@ function fakeAmapClient(
   };
 }
 
+function chargingPoi(
+  id: string,
+  name: string,
+  typecode: string,
+  type: string,
+) {
+  return {
+    id,
+    name,
+    location: "116.400000,39.900000",
+    distance: "1000",
+    type,
+    typecode,
+  };
+}
+
 describe("API routes", () => {
   it("reports service health without exposing configuration", async () => {
     const response = await request(
@@ -65,6 +81,92 @@ describe("API routes", () => {
       name: "京藏高速百葛服务区充电站",
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("keeps only automotive charging and swapping POI categories", async () => {
+    const raw = {
+      status: "1",
+      info: "OK",
+      infocode: "10000",
+      count: "8",
+      pois: [
+        chargingPoi(
+          "car-charge",
+          "汽车公共充电站",
+          "011100",
+          "汽车服务;充电站;充电站",
+        ),
+        chargingPoi(
+          "car-swap",
+          "汽车换电站",
+          "011101",
+          "汽车服务;换电站;换电站",
+        ),
+        chargingPoi(
+          "car-both",
+          "汽车充换电站",
+          "011102",
+          "汽车服务;充电站;充换电站",
+        ),
+        chargingPoi(
+          "car-dedicated",
+          "汽车专用充电站",
+          "011103",
+          "汽车服务;充电站;专用充电站",
+        ),
+        chargingPoi(
+          "bike-charge",
+          "电动自行车充电站",
+          "073000",
+          "生活服务;电动自行车充电站;电动自行车充电站",
+        ),
+        chargingPoi(
+          "bike-swap",
+          "电动自行车换电站",
+          "073001",
+          "生活服务;电动自行车充电站;电动自行车换电站",
+        ),
+        chargingPoi(
+          "swap-cabinet",
+          "社区智能换电柜",
+          "011100",
+          "汽车服务;充电站;充电站",
+        ),
+        chargingPoi(
+          "bike-misclassified",
+          "电动自行车专用充电站",
+          "011103",
+          "汽车服务;充电站;专用充电站",
+        ),
+      ],
+    };
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => raw,
+      searchChargingStationsByKeyword: async () => raw,
+    });
+    const app = createApp({ amapClient });
+
+    const [nearby, keyword] = await Promise.all([
+      request(app).get(
+        "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+      ),
+      request(app).get("/api/search-stations?keywords=%E5%85%85%E7%94%B5"),
+    ]);
+    const expectedNames = [
+      "汽车公共充电站",
+      "汽车换电站",
+      "汽车充换电站",
+      "汽车专用充电站",
+    ];
+
+    expect(nearby.status).toBe(200);
+    expect(nearby.body.items.map((item: { name: string }) => item.name)).toEqual(
+      expectedNames,
+    );
+    expect(keyword.status).toBe(200);
+    expect(keyword.body.items.map((item: { name: string }) => item.name)).toEqual(
+      expectedNames,
+    );
   });
 
   it("marks a paginated nearby result as truncated", async () => {
