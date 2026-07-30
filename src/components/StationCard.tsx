@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   Clock3,
   MapPin,
   Navigation,
@@ -63,6 +64,16 @@ export function StationCard({
               </span>
             ) : (
               <span>充电站</span>
+            )}
+            {station.qualityNetworkBrand && (
+              <span
+                className="quality-network-badge"
+                title={`${station.qualityNetworkBrand} · 优质充电网络`}
+                aria-label={`${station.qualityNetworkBrand}，优质充电网络`}
+              >
+                <BadgeCheck aria-hidden="true" size={13} />
+                优质充电网络
+              </span>
             )}
             {station.openingToday && (
               <span className="opening-now">

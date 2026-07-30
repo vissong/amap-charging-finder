@@ -27,6 +27,7 @@ function station(
     city: "北京市",
     district: "昌平区",
     alias: null,
+    qualityNetworkBrand: null,
     phone: null,
     openingToday: "00:00-24:00",
     openingWeek: null,
@@ -125,6 +126,31 @@ test("nearby stations stay distance-sorted and expose the AMap URI", async (
   await expect(amapLink).toHaveAttribute("href", /callnative=1/);
   await expect(amapLink).toHaveAttribute("href", /poiid=ordinary/);
 });
+
+test(
+  "a curated quality network station shows its badge",
+  async ({ page }, testInfo) => {
+    await mockApi(page, {
+      stations: [
+        {
+          ...ordinary,
+          name: "特来电望京超级充电站",
+          qualityNetworkBrand: "特来电",
+        },
+      ],
+    });
+    await page.goto("/");
+
+    await expect(page.getByLabel("特来电，优质充电网络")).toBeVisible();
+
+    if (process.env.CAPTURE_VISUALS === "1") {
+      await page.screenshot({
+        path: testInfo.outputPath("quality-network-badge.png"),
+        fullPage: true,
+      });
+    }
+  },
+);
 
 test("a moving highway session prioritizes the forward service-area station", async ({
   context,
