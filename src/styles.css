@@ -167,41 +167,34 @@ button {
 
 .status-bar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-bottom: 0.0625rem solid var(--road-700);
 }
 
 .status-cell {
   display: grid;
   min-width: 0;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
-  column-gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-1);
   border-right: 0.0625rem solid var(--road-700);
-  border-bottom: 0.0625rem solid var(--road-700);
+  text-align: center;
 }
 
-.status-cell:nth-child(2n) {
+.status-cell:last-child {
   border-right: 0;
 }
 
-.status-cell:nth-child(n + 3) {
-  border-bottom: 0;
-}
-
 .status-cell > svg {
-  grid-row: 1 / 4;
-  align-self: center;
-  color: var(--ink-500);
+  display: none;
 }
 
 .status-cell > span,
 .status-cell > small {
   overflow: hidden;
   color: var(--ink-500);
-  font-size: 0.68rem;
-  line-height: 1.3;
+  font-size: 0.6rem;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -209,16 +202,16 @@ button {
 .status-cell > strong {
   overflow: hidden;
   color: var(--ink-100);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .status-cell--speed > strong {
   font-family: "Barlow Condensed", sans-serif;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.03em;
 }
@@ -1019,16 +1012,37 @@ button {
   }
 
   .status-cell {
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    column-gap: var(--space-2);
+    padding: var(--space-3);
     border-right: 0.0625rem solid var(--road-700);
-    border-bottom: 0;
+    text-align: left;
   }
 
-  .status-cell:nth-child(2n) {
-    border-right: 0.0625rem solid var(--road-700);
+  .status-cell > svg {
+    display: block;
+    grid-row: 1 / 4;
+    align-self: center;
+    color: var(--ink-500);
   }
 
   .status-cell:last-child {
     border-right: 0;
+  }
+
+  .status-cell > span,
+  .status-cell > small {
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+
+  .status-cell > strong {
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+
+  .status-cell--speed > strong {
+    font-size: 1.15rem;
   }
 
   .station-card h3 {
