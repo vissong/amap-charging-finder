@@ -6,6 +6,7 @@ import type {
   RoadContext,
   ServiceArea,
 } from "../shared/contracts";
+import { matchQualityChargingNetwork } from "../shared/quality-charging-networks";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -104,6 +105,7 @@ export function normalizeChargingStations(
     const navi = record(source.navi);
     const alias = text(business?.alias);
     if (!isAutomotiveChargingPoi(source, name, alias)) return [];
+    const qualityNetworkBrand = matchQualityChargingNetwork(name, alias);
 
     return [
       {
@@ -119,6 +121,7 @@ export function normalizeChargingStations(
         city: text(source.cityname),
         district: text(source.adname),
         alias,
+        qualityNetworkBrand: qualityNetworkBrand?.label ?? null,
         phone: text(business?.tel),
         openingToday: text(business?.opentime_today),
         openingWeek: text(business?.opentime_week),

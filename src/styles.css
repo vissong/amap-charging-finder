@@ -766,10 +766,19 @@ button {
 }
 
 .area-badge,
+.quality-network-badge,
 .opening-now {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+.quality-network-badge {
+  padding: 0.1rem var(--space-2);
+  background: var(--charge-soft);
+  color: var(--charge);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .area-badge {

@@ -18,6 +18,7 @@ const station: ChargingStation = {
   city: "北京市",
   district: "朝阳区",
   alias: null,
+  qualityNetworkBrand: null,
   phone: null,
   openingToday: null,
   openingWeek: null,

@@ -17,6 +17,7 @@ const station: ChargingStation = {
   city: "北京市",
   district: "朝阳区",
   alias: null,
+  qualityNetworkBrand: null,
   phone: null,
   openingToday: null,
   openingWeek: null,
@@ -69,5 +70,22 @@ describe("StationCard", () => {
 
     expect(screen.getByText("服务区附近")).toBeVisible();
     expect(screen.queryByText("服务区内")).not.toBeInTheDocument();
+  });
+
+  it("marks a station that matches the curated quality network list", () => {
+    render(
+      <StationCard
+        station={{
+          ...station,
+          name: "特来电望京超级充电站",
+          qualityNetworkBrand: "特来电",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("优质充电网络")).toHaveAttribute(
+      "title",
+      "特来电 · 优质充电网络",
+    );
   });
 });

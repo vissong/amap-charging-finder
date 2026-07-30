@@ -69,6 +69,7 @@ function station(
     city: "北京市",
     district: "昌平区",
     alias: null,
+    qualityNetworkBrand: null,
     phone: null,
     openingToday: null,
     openingWeek: null,

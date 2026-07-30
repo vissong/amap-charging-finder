@@ -38,6 +38,7 @@ function station(
     photos: [],
     children: [],
     ...overrides,
+    qualityNetworkBrand: overrides.qualityNetworkBrand ?? null,
   };
 }
 

@@ -175,6 +175,35 @@ describe("API routes", () => {
     );
   });
 
+  it("exposes a curated quality network brand for matching stations", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => ({
+        status: "1",
+        info: "OK",
+        infocode: "10000",
+        count: "1",
+        pois: [
+          chargingPoi(
+            "quality-network",
+            "特来电望京超级充电站",
+            "011100",
+            "汽车服务;充电站;充电站",
+          ),
+        ],
+      }),
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.items[0]).toMatchObject({
+      name: "特来电望京超级充电站",
+      qualityNetworkBrand: "特来电",
+    });
+  });
+
   it("marks a paginated nearby result as truncated", async () => {
     const amapClient = fakeAmapClient({
       searchChargingStations: async () => ({

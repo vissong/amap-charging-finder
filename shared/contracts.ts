@@ -29,6 +29,7 @@ export interface ChargingStation {
   city: string | null;
   district: string | null;
   alias: string | null;
+  qualityNetworkBrand: string | null;
   phone: string | null;
   openingToday: string | null;
   openingWeek: string | null;
