@@ -4,11 +4,15 @@ function isMobileH5(userAgent: string): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent);
 }
 
+function isWeChatH5(userAgent: string): boolean {
+  return /MicroMessenger/i.test(userAgent);
+}
+
 export function buildAmapMarkerUri(
   station: ChargingStation,
   userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent,
 ): string {
-  if (isMobileH5(userAgent)) {
+  if (isMobileH5(userAgent) && !isWeChatH5(userAgent)) {
     const search = new URLSearchParams({
       poiname: station.name,
       lat: String(station.location.lat),
