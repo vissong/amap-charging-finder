@@ -96,8 +96,7 @@ export function useChargingSearch({
   fetchImpl,
 }: UseChargingSearchInput): ChargingSearchState {
   const initialStatus: ChargingSearchStatus =
-    mode === "forward" &&
-    (motion.phase !== "moving" || motion.heading === null)
+    mode === "forward" && motion.heading === null
       ? "awaiting-direction"
       : "idle";
   const [state, setState] = useState<
@@ -129,10 +128,7 @@ export function useChargingSearch({
       return;
     }
 
-    if (
-      mode === "forward" &&
-      (motion.phase !== "moving" || motion.heading === null)
-    ) {
+    if (mode === "forward" && motion.heading === null) {
       setState((previous) => ({
         ...previous,
         status: "awaiting-direction",
@@ -208,7 +204,9 @@ export function useChargingSearch({
           latest.accuracyMeters,
         );
         const areaResponse =
-          motion.phase === "moving" && highwayState !== "normal"
+          highwayState !== "normal" &&
+          (motion.phase === "moving" ||
+            (mode === "forward" && motion.heading !== null))
             ? await fetchServiceAreas(latest.location, radius, options)
             : { items: [], count: 0 };
         if (requestId !== requestIdRef.current) return;
