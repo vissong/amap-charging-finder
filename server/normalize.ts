@@ -16,7 +16,7 @@ const automotiveChargingTypecodes = new Set([
   "011103",
 ]);
 const micromobilityPattern =
-  /电动自行车|自行车充电|自行车换电|电瓶车|两轮车|换电柜|充电柜/i;
+  /电动自行车|自行车充电|自行车换电|电瓶车|两轮车|换电柜|充电柜|i换电/i;
 
 function record(value: unknown): UnknownRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)

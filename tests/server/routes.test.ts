@@ -88,7 +88,7 @@ describe("API routes", () => {
       status: "1",
       info: "OK",
       infocode: "10000",
-      count: "8",
+      count: "9",
       pois: [
         chargingPoi(
           "car-charge",
@@ -137,6 +137,12 @@ describe("API routes", () => {
           "电动自行车专用充电站",
           "011103",
           "汽车服务;充电站;专用充电站",
+        ),
+        chargingPoi(
+          "B0MAX5LZ4V",
+          "(i换电)北京海淀区百望山换电站",
+          "011100",
+          "汽车服务;充电站;充电站",
         ),
       ],
     };
