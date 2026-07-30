@@ -6,7 +6,9 @@ import type {
   RoadContext,
   ServiceArea,
 } from "../shared/contracts";
+import { haversineMeters } from "../shared/geo";
 import { matchQualityChargingNetwork } from "../shared/quality-charging-networks";
+import { serviceAreaKeywordCore } from "../shared/search-keyword";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -68,6 +70,10 @@ function normalizeChildren(value: unknown): PoiChild[] {
 
 function pois(response: unknown): unknown[] {
   return list(record(response)?.pois);
+}
+
+function tips(response: unknown): unknown[] {
+  return list(record(response)?.tips);
 }
 
 function isAutomotiveChargingPoi(
@@ -132,6 +138,76 @@ export function normalizeChargingStations(
       },
     ];
   });
+}
+
+const chargingTypeNames: Record<string, string> = {
+  "011100": "汽车服务;充电站;充电站",
+  "011101": "汽车服务;换电站;换电站",
+  "011102": "汽车服务;充电站;充换电站",
+  "011103": "汽车服务;充电站;专用充电站",
+};
+
+export function normalizeServiceAreaChargingStations(
+  response: unknown,
+  keyword: string,
+): ChargingStation[] {
+  const source = record(response);
+  const anchor = record(source?.anchor);
+  const anchorLocation = coordinate(anchor?.location);
+  const core = serviceAreaKeywordCore(keyword);
+  if (!anchor || !anchorLocation || !core) return [];
+
+  const stations = tips(response).flatMap((candidate) => {
+    const suggestion = record(candidate);
+    const id = text(suggestion?.id);
+    const name = text(suggestion?.name);
+    const location = coordinate(suggestion?.location);
+    const typecode = text(suggestion?.typecode);
+    if (!suggestion || !id || !name || !location || !typecode) {
+      return [];
+    }
+    if (!isAutomotiveChargingPoi(suggestion, name, null)) return [];
+
+    const address = text(suggestion.address);
+    const distanceMeters = Math.round(
+      haversineMeters(anchorLocation, location),
+    );
+    const description = `${name}${address ?? ""}`.replace(/\s+/gu, "");
+    if (!description.includes(core) && distanceMeters > 1_200) return [];
+
+    const qualityNetworkBrand = matchQualityChargingNetwork(name);
+    return [
+      {
+        id,
+        parentId: text(anchor.id),
+        name,
+        location,
+        distanceMeters,
+        type: chargingTypeNames[typecode] ?? null,
+        typecode,
+        address,
+        province: text(anchor.pname),
+        city: text(anchor.cityname),
+        district: text(anchor.adname) ?? text(suggestion.district),
+        alias: null,
+        qualityNetworkBrand: qualityNetworkBrand?.label ?? null,
+        phone: null,
+        openingToday: null,
+        openingWeek: null,
+        entrance: null,
+        exit: null,
+        photos: [],
+        children: [],
+      } satisfies ChargingStation,
+    ];
+  });
+
+  return [...new Map(stations.map((station) => [station.id, station])).values()]
+    .sort(
+      (first, second) =>
+        first.distanceMeters - second.distanceMeters ||
+        first.name.localeCompare(second.name),
+    );
 }
 
 export function normalizeServiceAreas(response: unknown): ServiceArea[] {
