@@ -130,10 +130,6 @@ export function App() {
               heading={tracker.motion.heading}
               items={radarItems}
             />
-            <div className="radar-disclaimer">
-              <span>公开 POI</span>
-              <p>不模拟枪数、功率、价格或忙闲状态</p>
-            </div>
           </section>
         )}
 

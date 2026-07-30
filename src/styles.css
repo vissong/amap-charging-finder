@@ -607,29 +607,6 @@ button {
   text-align: right;
 }
 
-.radar-disclaimer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-1) 0;
-}
-
-.radar-disclaimer span {
-  flex: 0 0 auto;
-  padding: 0.18rem var(--space-2);
-  background: var(--charge-soft);
-  color: var(--charge);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
-.radar-disclaimer p {
-  margin: 0;
-  color: var(--ink-500);
-  font-size: 0.72rem;
-}
-
 .results-panel {
   min-height: 16rem;
   background: var(--road-925);
@@ -1194,9 +1171,6 @@ button {
     min-height: 2.6rem;
   }
 
-  .radar-disclaimer {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
