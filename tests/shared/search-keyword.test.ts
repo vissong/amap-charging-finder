@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeStationKeyword } from "../../shared/search-keyword";
+import {
+  normalizeStationKeyword,
+  serviceAreaKeywordCore,
+} from "../../shared/search-keyword";
 
 describe("charging station search keyword", () => {
   it("appends the charging-station qualifier after trimming whitespace", () => {
@@ -24,5 +27,13 @@ describe("charging station search keyword", () => {
   it("rejects empty or overlong submitted keywords", () => {
     expect(normalizeStationKeyword("   ")).toBeNull();
     expect(normalizeStationKeyword("孟".repeat(77))).toBeNull();
+  });
+
+  it("extracts a stable place core from a service-area query", () => {
+    expect(serviceAreaKeywordCore("云峰山服务区")).toBe("云峰山");
+    expect(serviceAreaKeywordCore("云峰山服务区 充电站")).toBe(
+      "云峰山",
+    );
+    expect(serviceAreaKeywordCore("望京充电站")).toBeNull();
   });
 });

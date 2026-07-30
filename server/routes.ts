@@ -8,9 +8,13 @@ import {
 import {
   normalizeChargingStations,
   normalizeRoadContext,
+  normalizeServiceAreaChargingStations,
   normalizeServiceAreas,
 } from "./normalize";
-import { normalizeStationKeyword } from "../shared/search-keyword";
+import {
+  normalizeStationKeyword,
+  serviceAreaKeywordCore,
+} from "../shared/search-keyword";
 
 const allowedRadii = [3_000, 5_000, 10_000, 20_000, 50_000];
 
@@ -124,7 +128,37 @@ export function createApiRouter(amapClient: AmapClient): Router {
       const raw = await amapClient.searchChargingStationsByKeyword(
         query.submitted,
       );
-      const items = normalizeChargingStations(raw);
+      let items = normalizeChargingStations(raw);
+      const serviceAreaCore = serviceAreaKeywordCore(query.display);
+      if (serviceAreaCore) {
+        try {
+          const anchoredRaw =
+            await amapClient.searchServiceAreaChargingStations(
+              query.display,
+            );
+          const anchored = normalizeServiceAreaChargingStations(
+            anchoredRaw,
+            query.display,
+          );
+          if (anchored.length > 0) {
+            const directlyRelevant = items.filter((station) =>
+              `${station.name}${station.address ?? ""}`
+                .replace(/\s+/gu, "")
+                .includes(serviceAreaCore),
+            );
+            items = [
+              ...new Map(
+                [...anchored, ...directlyRelevant].map((station) => [
+                  station.id,
+                  station,
+                ]),
+              ).values(),
+            ];
+          }
+        } catch {
+          // Supplementary discovery must not hide valid direct results.
+        }
+      }
       response.json({ query, items, count: items.length });
     }),
   );

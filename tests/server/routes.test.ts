@@ -18,6 +18,10 @@ function fakeAmapClient(
   return {
     searchChargingStations: async () => fullAmapPoiResponse,
     searchChargingStationsByKeyword: async () => fullAmapPoiResponse,
+    searchServiceAreaChargingStations: async () => ({
+      anchor: null,
+      tips: [],
+    }),
     searchServiceAreas: async () => amapServiceAreaResponse,
     reverseGeocode: async () => amapRoadContextResponse,
     ...overrides,
@@ -242,6 +246,91 @@ describe("API routes", () => {
       },
       count: 1,
     });
+    expect(response.body.items[0].name).toBe(
+      "京藏高速百葛服务区充电站",
+    );
+  });
+
+  it("finds charging stations anchored to a named service area", async () => {
+    const directButIrrelevant = {
+      status: "1",
+      info: "OK",
+      infocode: "10000",
+      count: "1",
+      pois: [
+        chargingPoi(
+          "irrelevant",
+          "辽宁桓宇超级充电站(参中堂充电站)",
+          "011100",
+          "汽车服务;充电站;充电站",
+        ),
+      ],
+    };
+    const amapClient = {
+      ...fakeAmapClient({
+        searchChargingStationsByKeyword: async () =>
+          directButIrrelevant,
+      }),
+      searchServiceAreaChargingStations: async () => ({
+        anchor: {
+          id: "B019E0NHJW",
+          name: "云峰山服务区(鹤大高速大连方向)",
+          location: "125.322855,41.234724",
+          pname: "辽宁省",
+          cityname: "本溪市",
+          adname: "桓仁满族自治县",
+        },
+        tips: [
+          {
+            id: "B0MUB55ZOO",
+            name: "辽宁交投超级充电站(云峰山服务区大连方向充电站·华为超充技术支持)",
+            location: "125.323095,41.235146",
+            address: "云峰山服务区(鹤大高速大连方向)",
+            typecode: "011100",
+          },
+          {
+            id: "B0MUB56DSJ",
+            name: "云峰山服务区电动汽车充电站",
+            location: "125.324449,41.234164",
+            address: "云峰山服务区治安执勤点",
+            typecode: "011100",
+          },
+          {
+            id: "B0MU4Z9NKA",
+            name: "辽宁交投超级充电站(华来服务区充电站)",
+            location: "125.125620,41.367016",
+            address: "华来服务区",
+            typecode: "011100",
+          },
+        ],
+      }),
+    } as AmapClient;
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/search-stations?keywords=%E4%BA%91%E5%B3%B0%E5%B1%B1%E6%9C%8D%E5%8A%A1%E5%8C%BA",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.items.map(({ name }: { name: string }) => name))
+      .toEqual([
+        "辽宁交投超级充电站(云峰山服务区大连方向充电站·华为超充技术支持)",
+        "云峰山服务区电动汽车充电站",
+      ]);
+    expect(response.body.count).toBe(2);
+  });
+
+  it("keeps direct results when service-area discovery is unavailable", async () => {
+    const amapClient = fakeAmapClient({
+      searchServiceAreaChargingStations: async () => {
+        throw new AmapUpstreamError("suggestions unavailable", "10021");
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/search-stations?keywords=%E5%AD%9F%E6%9D%91%E6%9C%8D%E5%8A%A1%E5%8C%BA",
+    );
+
+    expect(response.status).toBe(200);
     expect(response.body.items[0].name).toBe(
       "京藏高速百葛服务区充电站",
     );

@@ -1,4 +1,5 @@
 import type { Coordinates } from "../shared/contracts";
+import { serviceAreaKeywordCore } from "../shared/search-keyword";
 
 export interface NearbySearchQuery extends Coordinates {
   radius: number;
@@ -7,6 +8,7 @@ export interface NearbySearchQuery extends Coordinates {
 export interface AmapClient {
   searchChargingStations(query: NearbySearchQuery): Promise<unknown>;
   searchChargingStationsByKeyword(keywords: string): Promise<unknown>;
+  searchServiceAreaChargingStations(keywords: string): Promise<unknown>;
   searchServiceAreas(query: NearbySearchQuery): Promise<unknown>;
   reverseGeocode(query: Coordinates): Promise<unknown>;
 }
@@ -29,6 +31,7 @@ interface CreateAmapClientOptions {
 
 const rateLimitInfocodes = new Set(["10021", "10029"]);
 const automotiveChargingTypes = "011100|011101|011102|011103";
+const serviceAreaType = "180300";
 
 function location({ lng, lat }: Coordinates): string {
   return `${lng.toFixed(6)},${lat.toFixed(6)}`;
@@ -100,7 +103,7 @@ export function createAmapClient({
 
   function searchNearbyPage(
     query: NearbySearchQuery,
-    typecode: typeof automotiveChargingTypes | "180300",
+    typecode: typeof automotiveChargingTypes | typeof serviceAreaType,
     pageNumber: number,
   ): Promise<unknown> {
     return request("/v5/place/around", {
@@ -117,7 +120,7 @@ export function createAmapClient({
 
   async function searchNearbyPages(
     query: NearbySearchQuery,
-    typecode: typeof automotiveChargingTypes | "180300",
+    typecode: typeof automotiveChargingTypes | typeof serviceAreaType,
     maximumPages: number,
   ): Promise<unknown> {
     let firstPayload: Record<string, unknown> | null = null;
@@ -193,8 +196,48 @@ export function createAmapClient({
         output: "json",
       });
     },
+    async searchServiceAreaChargingStations(keywords) {
+      const core = serviceAreaKeywordCore(keywords);
+      if (!core) return { anchor: null, tips: [] };
+
+      const serviceAreas = (await request("/v5/place/text", {
+        keywords,
+        types: serviceAreaType,
+        show_fields: "business,navi",
+        page_size: "10",
+        page_num: "1",
+        output: "json",
+      })) as Record<string, unknown>;
+      const anchor = Array.isArray(serviceAreas.pois)
+        ? serviceAreas.pois[0]
+        : null;
+      if (!anchor || typeof anchor !== "object") {
+        return { anchor: null, tips: [] };
+      }
+
+      const source = anchor as Record<string, unknown>;
+      const city =
+        typeof source.adcode === "string" ? source.adcode : "";
+      const anchorLocation =
+        typeof source.location === "string" ? source.location : "";
+      const tips: unknown[] = [];
+
+      for (const [index, suggestionKeyword] of [core, "交投"].entries()) {
+        if (index > 0) await sleepImpl(400);
+        const payload = (await request("/v3/assistant/inputtips", {
+          keywords: suggestionKeyword,
+          ...(city ? { city, citylimit: "true" } : {}),
+          ...(anchorLocation ? { location: anchorLocation } : {}),
+          datatype: "poi",
+          output: "json",
+        })) as Record<string, unknown>;
+        if (Array.isArray(payload.tips)) tips.push(...payload.tips);
+      }
+
+      return { anchor, tips };
+    },
     searchServiceAreas(query) {
-      return searchNearbyPages(query, "180300", 1);
+      return searchNearbyPages(query, serviceAreaType, 1);
     },
     reverseGeocode(query) {
       return request("/v3/geocode/regeo", {

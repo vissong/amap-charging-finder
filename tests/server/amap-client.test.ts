@@ -259,6 +259,75 @@ describe("AMap HTTP client", () => {
     );
   });
 
+  it("discovers service-area charging stations through localized suggestions", async () => {
+    const requestedUrls: URL[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = new URL(String(input));
+      requestedUrls.push(url);
+      if (url.pathname === "/v5/place/text") {
+        return new Response(
+          JSON.stringify({
+            status: "1",
+            info: "OK",
+            pois: [
+              {
+                id: "service-area",
+                name: "云峰山服务区(鹤大高速大连方向)",
+                location: "125.322855,41.234724",
+                adcode: "210522",
+              },
+            ],
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          status: "1",
+          info: "OK",
+          tips: [
+            {
+              id: `tip-${url.searchParams.get("keywords")}`,
+              name: "云峰山服务区充电站",
+              location: "125.323095,41.235146",
+              typecode: "011100",
+            },
+          ],
+        }),
+      );
+    };
+    const sleepDurations: number[] = [];
+    const client = createAmapClient({
+      key: "server-only-key",
+      fetchImpl,
+      sleepImpl: async (milliseconds) => {
+        sleepDurations.push(milliseconds);
+      },
+    });
+
+    const response = (await client.searchServiceAreaChargingStations(
+      "云峰山服务区",
+    )) as { tips: unknown[] };
+
+    expect(requestedUrls).toHaveLength(3);
+    expect(requestedUrls[0].pathname).toBe("/v5/place/text");
+    expect(requestedUrls[0].searchParams.get("keywords")).toBe(
+      "云峰山服务区",
+    );
+    expect(requestedUrls[0].searchParams.get("types")).toBe("180300");
+    expect(requestedUrls[1].pathname).toBe(
+      "/v3/assistant/inputtips",
+    );
+    expect(requestedUrls[1].searchParams.get("keywords")).toBe("云峰山");
+    expect(requestedUrls[1].searchParams.get("city")).toBe("210522");
+    expect(requestedUrls[1].searchParams.get("citylimit")).toBe("true");
+    expect(requestedUrls[1].searchParams.get("location")).toBe(
+      "125.322855,41.234724",
+    );
+    expect(requestedUrls[2].searchParams.get("keywords")).toBe("交投");
+    expect(sleepDurations).toEqual([400]);
+    expect(response.tips).toHaveLength(2);
+  });
+
   it("rejects a successful HTTP response with an AMap failure status", async () => {
     const client = createAmapClient({
       key: "server-only-key",

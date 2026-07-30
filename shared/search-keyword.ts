@@ -4,6 +4,7 @@ export interface StationKeyword {
 }
 
 const chargingQualifier = /充电(?:站|桩)/u;
+const serviceAreaQualifier = /服务区/u;
 
 export function normalizeStationKeyword(
   input: string,
@@ -16,4 +17,16 @@ export function normalizeStationKeyword(
     : `${display} 充电站`;
 
   return submitted.length <= 80 ? { display, submitted } : null;
+}
+
+export function serviceAreaKeywordCore(input: string): string | null {
+  if (!serviceAreaQualifier.test(input)) return null;
+
+  const core = input
+    .replace(chargingQualifier, "")
+    .replace(serviceAreaQualifier, "")
+    .replace(/\s+/gu, "")
+    .trim();
+
+  return core.length >= 2 ? core : null;
 }
