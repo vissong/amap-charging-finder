@@ -55,8 +55,10 @@ fi
     printf 'healthy\n'
     exit 0
   fi
-  if [[ "${1:-}" == "exec" && "$*" == "exec test-container wget --no-check-certificate -qO- https://127.0.0.1/api/health" ]]; then
+  if [[ "${1:-}" == "exec" &&
+    "$*" == exec\ test-container\ wget\ --header\ Host:\ *\ --no-check-certificate\ -qO-\ https://127.0.0.1/api/health ]]; then
     assert_success_not_reported
+    [[ "${FAIL_HTTPS_HEALTH:-0}" != "1" ]] || exit 8
     printf '{"status":"ok"}\n'
     exit 0
   fi
@@ -107,6 +109,12 @@ esac
 FAKE_DOCKER
 chmod +x "$fake_bin/docker"
 
+cat >"$fake_bin/sleep" <<'FAKE_SLEEP'
+#!/usr/bin/env bash
+exit 0
+FAKE_SLEEP
+chmod +x "$fake_bin/sleep"
+
 run_deploy() {
   : >"$calls"
   : >"$compose_env"
@@ -117,6 +125,7 @@ run_deploy() {
       COMPOSE_ENV="$compose_env" \
       DEPLOY_OUTPUT="$output" \
       FAIL_CADDY_RM="${FAIL_CADDY_RM:-0}" \
+      FAIL_HTTPS_HEALTH="${FAIL_HTTPS_HEALTH:-0}" \
       ./deploy.sh
   ) >"$output" 2>&1
 }
@@ -212,8 +221,16 @@ grep -E '^compose .*--profile https .*up -d --build --remove-orphans$' "$calls"
 grep -F "https://203.0.113.10" "$output"
 grep -F "|PUBLIC_IP=203.0.113.10|HTTPS_HOST=203.0.113.10|TLS_SERVER_NAME=203.0.113.10|CADDY_CONFIG_PATH=$case_dir/Caddyfile.ip|" \
   "$compose_env"
-grep -Fx "exec test-container wget --no-check-certificate -qO- https://127.0.0.1/api/health" \
+grep -Fx "exec test-container wget --header Host: 203.0.113.10 --no-check-certificate -qO- https://127.0.0.1/api/health" \
   "$calls"
+
+# A failed internal route check reports the actual diagnostic scope.
+if FAIL_HTTPS_HEALTH=1 run_deploy; then
+  echo "failed internal HTTPS health check must fail deployment" >&2
+  exit 1
+fi
+grep -F "Caddy 内部 HTTPS 健康检查失败" "$output"
+! grep -F "公网 80/443" "$output"
 
 # Public IPv6 deployment enables HTTPS and prints a bracketed URL.
 printf 'AMAP_WEB_SERVICE_KEY=test-secret\nAPP_PORT=3100\nDOMAIN=\nPUBLIC_IP=2001:db8::10\n' \
