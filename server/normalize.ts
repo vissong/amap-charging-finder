@@ -9,6 +9,15 @@ import type {
 
 type UnknownRecord = Record<string, unknown>;
 
+const automotiveChargingTypecodes = new Set([
+  "011100",
+  "011101",
+  "011102",
+  "011103",
+]);
+const micromobilityPattern =
+  /电动自行车|自行车充电|自行车换电|电瓶车|两轮车|换电柜|充电柜/i;
+
 function record(value: unknown): UnknownRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as UnknownRecord)
@@ -60,6 +69,27 @@ function pois(response: unknown): unknown[] {
   return list(record(response)?.pois);
 }
 
+function isAutomotiveChargingPoi(
+  source: UnknownRecord,
+  name: string,
+  alias: string | null,
+): boolean {
+  const typecode = text(source.typecode);
+  if (!typecode || !automotiveChargingTypecodes.has(typecode)) {
+    return false;
+  }
+
+  const description = [
+    name,
+    text(source.type),
+    text(source.address),
+    alias,
+  ]
+    .filter(Boolean)
+    .join(";");
+  return !micromobilityPattern.test(description);
+}
+
 export function normalizeChargingStations(
   response: unknown,
 ): ChargingStation[] {
@@ -72,6 +102,8 @@ export function normalizeChargingStations(
 
     const business = record(source.business);
     const navi = record(source.navi);
+    const alias = text(business?.alias);
+    if (!isAutomotiveChargingPoi(source, name, alias)) return [];
 
     return [
       {
@@ -86,7 +118,7 @@ export function normalizeChargingStations(
         province: text(source.pname),
         city: text(source.cityname),
         district: text(source.adname),
-        alias: text(business?.alias),
+        alias,
         phone: text(business?.tel),
         openingToday: text(business?.opentime_today),
         openingWeek: text(business?.opentime_week),
