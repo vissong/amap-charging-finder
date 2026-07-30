@@ -151,6 +151,10 @@ describe("App", () => {
     ).toBeVisible();
     expect(screen.getByText("望京路")).toBeVisible();
     expect(screen.getByText("前电")).toBeVisible();
+    expect(screen.queryByText("公开 POI")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("不模拟枪数、功率、价格或忙闲状态"),
+    ).not.toBeInTheDocument();
   });
 
   it("explains why forward recommendations are not ready while stationary", async () => {
