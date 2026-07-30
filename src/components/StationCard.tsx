@@ -54,34 +54,38 @@ export function StationCard({
         </div>
 
         <div className="station-card__body">
-          <div className="station-card__eyebrow">
-            {serviceAreaMatch ? (
-              <span className={`area-badge area-badge--${serviceAreaMatch.kind}`}>
-                <Route aria-hidden="true" size={14} />
-                {serviceAreaMatch.kind === "inside"
-                  ? "服务区内"
-                  : "服务区附近"}
-              </span>
-            ) : (
-              <span>充电站</span>
-            )}
-            {station.qualityNetworkBrand && (
-              <span
-                className="quality-network-badge"
-                title={`${station.qualityNetworkBrand} · 优质充电网络`}
-                aria-label={`${station.qualityNetworkBrand}，优质充电网络`}
-              >
-                <BadgeCheck aria-hidden="true" size={13} />
-                优质充电网络
-              </span>
-            )}
-            {station.openingToday && (
-              <span className="opening-now">
-                <Clock3 aria-hidden="true" size={13} />
-                {station.openingToday}
-              </span>
-            )}
-          </div>
+          {(serviceAreaMatch ||
+            station.qualityNetworkBrand ||
+            station.openingToday) && (
+            <div className="station-card__eyebrow">
+              {serviceAreaMatch && (
+                <span
+                  className={`area-badge area-badge--${serviceAreaMatch.kind}`}
+                >
+                  <Route aria-hidden="true" size={14} />
+                  {serviceAreaMatch.kind === "inside"
+                    ? "服务区内"
+                    : "服务区附近"}
+                </span>
+              )}
+              {station.qualityNetworkBrand && (
+                <span
+                  className="quality-network-badge"
+                  title={`${station.qualityNetworkBrand} · 优质充电网络`}
+                  aria-label={`${station.qualityNetworkBrand}，优质充电网络`}
+                >
+                  <BadgeCheck aria-hidden="true" size={13} />
+                  优质充电网络
+                </span>
+              )}
+              {station.openingToday && (
+                <span className="opening-now">
+                  <Clock3 aria-hidden="true" size={13} />
+                  {station.openingToday}
+                </span>
+              )}
+            </div>
+          )}
 
           <h3>{station.name}</h3>
           {address && (
