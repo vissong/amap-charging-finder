@@ -216,7 +216,8 @@ if [[ -n "$https_host" ]]; then
     if [[ -n "$public_ip" ]]; then
       https_health="$(
         docker exec "$caddy_container_id" \
-          wget --no-check-certificate -qO- \
+          wget --header "Host: $https_host" \
+          --no-check-certificate -qO- \
           https://127.0.0.1/api/health 2>/dev/null || true
       )"
       if [[ "$https_health" == '{"status":"ok"}' ]]; then
@@ -232,7 +233,7 @@ if [[ -n "$https_host" ]]; then
 
   if [[ "$https_ready" != true ]]; then
     run_selected_compose logs --tail=30 caddy >&2 || true
-    fail "IP HTTPS 握手失败，请确认公网 80/443 端口已放行"
+    fail "Caddy 内部 HTTPS 健康检查失败，请检查上方日志"
   fi
 fi
 
