@@ -27,6 +27,11 @@ const currentSample: PositionSample = {
   headingDegrees: 0,
 };
 
+const stoppedSample: PositionSample = {
+  ...currentSample,
+  speedMps: 0,
+};
+
 const movingNorth: MotionSnapshot = {
   ...initialMotionSnapshot,
   phase: "moving",
@@ -34,6 +39,14 @@ const movingNorth: MotionSnapshot = {
   speedMps: 12,
   heading: 0,
   movingVotes: 2,
+};
+
+const stoppedNorth: MotionSnapshot = {
+  ...initialMotionSnapshot,
+  phase: "stationary",
+  accurate: true,
+  speedMps: 0,
+  heading: 0,
 };
 
 function station(
@@ -184,7 +197,7 @@ describe("useChargingSearch", () => {
     expect(result.current.truncated).toBe(true);
   });
 
-  it("prioritizes a service-area station on a confirmed highway", async () => {
+  it("loads forward service-area stations when stopped with a known direction", async () => {
     const fetchImpl: typeof fetch = async (input) => {
       const url = new URL(String(input), "http://localhost");
       if (url.pathname === "/api/charging-stations") {
@@ -211,8 +224,8 @@ describe("useChargingSearch", () => {
 
     const { result } = renderHook(() =>
       useChargingSearch({
-        latest: currentSample,
-        motion: movingNorth,
+        latest: stoppedSample,
+        motion: stoppedNorth,
         mode: "forward",
         radius: 50_000,
         fetchImpl,
