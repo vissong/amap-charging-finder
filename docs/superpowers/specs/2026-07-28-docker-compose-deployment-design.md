@@ -38,12 +38,14 @@ git pull --ff-only
 
 ```dotenv
 AMAP_WEB_SERVICE_KEY=
+AMAP_MAX_QPS=3
 PORT=3000
 APP_PORT=3000
 DOMAIN=
 ```
 
 - `AMAP_WEB_SERVICE_KEY`：必填，只在运行时注入应用容器。
+- `AMAP_MAX_QPS`：可选，单应用进程允许的高德上游请求 QPS，默认 `3`，仅接受 `1` 至 `3`。
 - `PORT`：可选，只用于不经过 Docker 的本地开发，默认 `3000`。
 - `APP_PORT`：可选，服务器对外暴露的 HTTP 端口，默认 `3000`。
 - `DOMAIN`：可选；非空时启用 Caddy HTTPS profile。

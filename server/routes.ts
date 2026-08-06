@@ -15,6 +15,7 @@ import {
   normalizeStationKeyword,
   serviceAreaKeywordCore,
 } from "../shared/search-keyword";
+import { RequestRateLimitError } from "./request-rate-limiter";
 
 const allowedRadii = [3_000, 5_000, 10_000, 20_000, 50_000];
 
@@ -47,6 +48,10 @@ const upstreamMessages: Record<string, string> = {
   "10002": "当前 Key 未开通高德 Web 服务 API",
   "10003": "高德接口今日调用配额已用完",
   "10005": "服务器公网 IP 未加入高德 Key 白名单",
+  "10014": "高德接口请求过于频繁，请稍后重试",
+  "10015": "高德接口请求过于频繁，请稍后重试",
+  "10019": "高德接口请求过于频繁，请稍后重试",
+  "10020": "高德接口请求过于频繁，请稍后重试",
   "10021": "高德接口请求过于频繁，请稍后重试",
   "10029": "高德接口请求过于频繁，请稍后重试",
   "10044": "高德账号今日调用配额已用完",
@@ -54,6 +59,19 @@ const upstreamMessages: Record<string, string> = {
 };
 
 function upstreamError(response: Response, error: unknown): void {
+  if (
+    error instanceof RequestRateLimitError &&
+    (error.code === "QUEUE_FULL" || error.code === "QUEUE_TIMEOUT")
+  ) {
+    response.status(503).json({
+      error: {
+        code: "AMAP_QUEUE_BUSY",
+        message: "当前查询请求较多，请稍后重试",
+      },
+    });
+    return;
+  }
+
   const upstreamCode =
     error instanceof AmapUpstreamError ? error.infocode : null;
   const message =
@@ -81,10 +99,23 @@ function asyncRoute(
   handler: (request: Request, response: Response) => Promise<void>,
 ): (request: Request, response: Response) => void {
   return (request, response) => {
-    handler(request, response).catch((error: unknown) =>
-      upstreamError(response, error),
-    );
+    handler(request, response).catch((error: unknown) => {
+      if (response.destroyed || response.writableEnded) return;
+      upstreamError(response, error);
+    });
   };
+}
+
+function clientAbortSignal(
+  request: Request,
+  response: Response,
+): AbortSignal {
+  const controller = new AbortController();
+  request.once("aborted", () => controller.abort());
+  response.once("close", () => {
+    if (!response.writableEnded) controller.abort();
+  });
+  return controller.signal;
 }
 
 export function createApiRouter(amapClient: AmapClient): Router {
@@ -103,7 +134,11 @@ export function createApiRouter(amapClient: AmapClient): Router {
         return;
       }
 
-      const raw = await amapClient.searchChargingStations(parsed.data);
+      const signal = clientAbortSignal(request, response);
+      const raw = await amapClient.searchChargingStations(
+        parsed.data,
+        signal,
+      );
       const items = normalizeChargingStations(raw, parsed.data)
         .filter((station) => station.distanceMeters <= parsed.data.radius)
         .sort(
@@ -130,8 +165,10 @@ export function createApiRouter(amapClient: AmapClient): Router {
         return;
       }
 
+      const signal = clientAbortSignal(request, response);
       const raw = await amapClient.searchChargingStationsByKeyword(
         query.submitted,
+        signal,
       );
       let items = normalizeChargingStations(raw);
       const serviceAreaCore = serviceAreaKeywordCore(query.display);
@@ -140,6 +177,7 @@ export function createApiRouter(amapClient: AmapClient): Router {
           const anchoredRaw =
             await amapClient.searchServiceAreaChargingStations(
               query.display,
+              signal,
             );
           const anchored = normalizeServiceAreaChargingStations(
             anchoredRaw,
@@ -160,7 +198,8 @@ export function createApiRouter(amapClient: AmapClient): Router {
               ).values(),
             ];
           }
-        } catch {
+        } catch (error) {
+          if (signal.aborted) throw error;
           // Supplementary discovery must not hide valid direct results.
         }
       }
@@ -177,7 +216,8 @@ export function createApiRouter(amapClient: AmapClient): Router {
         return;
       }
 
-      const raw = await amapClient.searchServiceAreas(parsed.data);
+      const signal = clientAbortSignal(request, response);
+      const raw = await amapClient.searchServiceAreas(parsed.data, signal);
       const items = normalizeServiceAreas(raw, parsed.data)
         .filter((area) => area.distanceMeters <= parsed.data.radius)
         .sort(
@@ -197,7 +237,8 @@ export function createApiRouter(amapClient: AmapClient): Router {
         return;
       }
 
-      const raw = await amapClient.reverseGeocode(parsed.data);
+      const signal = clientAbortSignal(request, response);
+      const raw = await amapClient.reverseGeocode(parsed.data, signal);
       response.json(normalizeRoadContext(raw));
     }),
   );

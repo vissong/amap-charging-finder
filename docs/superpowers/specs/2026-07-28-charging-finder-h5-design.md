@@ -74,7 +74,23 @@ show_fields=business,navi,photos,children
 - <https://lbs.amap.com/api/webservice/guide/api-advanced/newpoisearch>
 - <https://lbs.amap.com/api/webservice/download>
 
-### 3.2 逆地理编码
+### 3.2 上游全局限流
+
+单个 Node 进程内的全部高德上游请求共享一个内存 FIFO 启动队列，包括周边搜索、关键词搜索、服务区搜索、输入提示和逆地理编码。默认 `AMAP_MAX_QPS=3`，配置只允许 `1` 至 `3`，可降低但不能突破当前 Key 的安全上限。相邻请求的启动时间至少间隔 `ceil(1000 / AMAP_MAX_QPS)` 毫秒；请求开始后不占用队列执行权，因此慢响应不会阻止后续请求按限额启动。
+
+队列最多保留 30 个等待请求，单个请求最多等待 10 秒，避免流量突增造成内存队列无界增长。队列已满或等待超时属于本地背压，API 返回 `503 AMAP_QUEUE_BUSY`。浏览器连接提前断开时，对应任务立即退出公开队列，未开始的高德请求不会再发出。定时器唤醒后会重新检查单调时钟和剩余等待时间，避免操作系统定时器提前唤醒而突破启动间隔。
+
+高德返回 `10014`、`10015`、`10019`、`10020`、`10021` 或 `10029` 等 QPS 错误时，限流器会把整个共享队列的下次启动时间推迟 1 秒，并重试当前请求一次。分页或补充查询不再自行固定等待，由全局队列统一调度。
+
+该实现不依赖数据库或 Redis，只保证单进程全局限流。默认 Docker Compose 仅运行一个应用实例；若部署多个实例，应按实例数保守分摊 Key 的总 QPS。个人认证开发者的基础搜索服务公开配额为 3 QPS，实际 Key 配额以高德控制台为准。
+
+官方参考：
+
+- <https://lbs.amap.com/pages/base_service_price>
+- <https://lbs.amap.com/api/webservice/guide/tools/flowlevel>
+- <https://lbs.amap.com/api/webservice/guide/tools/info>
+
+### 3.3 逆地理编码
 
 服务端按节流策略调用：
 
@@ -88,7 +104,7 @@ GET https://restapi.amap.com/v3/geocode/regeo
 
 - <https://lbs.amap.com/api/webservice/guide/api/georegeo>
 
-### 3.3 高速服务区
+### 3.4 高速服务区
 
 高速服务区使用高德 POI 类型 `180300`。当高速状态为“较可信”或“可能”时，在当前点周边按同一推荐半径查询服务区。
 
@@ -100,7 +116,7 @@ GET https://restapi.amap.com/v3/geocode/regeo
 
 第 1、2 种关联可显示“服务区内”；仅由第 3 种规则关联时显示“服务区附近”，避免把空间推断表述成确定事实。
 
-### 3.4 高德跳转
+### 3.5 高德跳转
 
 详情操作通过高德 URI API 生成标点或导航链接，使用高德坐标系并设置 `callnative=1`。移动端尝试调起高德地图 App，未安装或不支持时由高德 URI 页面回退到 H5。
 

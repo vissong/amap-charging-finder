@@ -1,3 +1,7 @@
+import { once } from "node:events";
+import { get as httpGet } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
@@ -6,6 +10,7 @@ import {
   type AmapClient,
 } from "../../server/amap-client";
 import { createApp } from "../../server/app";
+import { RequestRateLimitError } from "../../server/request-rate-limiter";
 import {
   amapRoadContextResponse,
   amapServiceAreaResponse,
@@ -86,6 +91,62 @@ describe("API routes", () => {
       distanceMeters: 0,
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("passes a live cancellation signal to the upstream request", async () => {
+    let receivedSignal: AbortSignal | undefined;
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async (_query, signal) => {
+        receivedSignal = signal;
+        return fullAmapPoiResponse;
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.2468&lat=40.1659&radius=10000",
+    );
+
+    expect(response.status).toBe(200);
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(receivedSignal?.aborted).toBe(false);
+  });
+
+  it("aborts the upstream signal after the HTTP client disconnects", async () => {
+    let provideSignal!: (signal: AbortSignal) => void;
+    const signalReceived = new Promise<AbortSignal>((resolve) => {
+      provideSignal = resolve;
+    });
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async (_query, signal) => {
+        if (!signal) throw new Error("missing abort signal");
+        provideSignal(signal);
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new Error("client disconnected")),
+            { once: true },
+          );
+        });
+      },
+    });
+    const server = createApp({ amapClient }).listen(0);
+    await once(server, "listening");
+
+    try {
+      const { port } = server.address() as AddressInfo;
+      const clientRequest = httpGet(
+        `http://127.0.0.1:${port}/api/charging-stations?lng=116.4&lat=39.9&radius=3000`,
+      );
+      clientRequest.on("error", () => {});
+      const signal = await signalReceived;
+
+      clientRequest.destroy();
+      if (!signal.aborted) await once(signal, "abort");
+
+      expect(signal.aborted).toBe(true);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it("calculates and filters nearby distance locally instead of trusting AMap", async () => {
@@ -477,5 +538,52 @@ describe("API routes", () => {
       },
     });
     expect(JSON.stringify(response.body)).not.toContain("INVALID_USER_IP");
+  });
+
+  it("returns a stable message when the Key still exceeds its QPS", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => {
+        throw new AmapUpstreamError(
+          "CKQPS_HAS_EXCEEDED_THE_LIMIT",
+          "10020",
+        );
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+    );
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      error: {
+        code: "AMAP_UPSTREAM_ERROR",
+        message: "高德接口请求过于频繁，请稍后重试",
+        upstreamCode: "10020",
+      },
+    });
+  });
+
+  it("returns service unavailable when the local AMap queue is full", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => {
+        throw new RequestRateLimitError(
+          "QUEUE_FULL",
+          "AMap request queue is full",
+        );
+      },
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      error: {
+        code: "AMAP_QUEUE_BUSY",
+        message: "当前查询请求较多，请稍后重试",
+      },
+    });
   });
 });
