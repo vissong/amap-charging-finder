@@ -104,7 +104,12 @@ export function createApiRouter(amapClient: AmapClient): Router {
       }
 
       const raw = await amapClient.searchChargingStations(parsed.data);
-      const items = normalizeChargingStations(raw);
+      const items = normalizeChargingStations(raw, parsed.data)
+        .filter((station) => station.distanceMeters <= parsed.data.radius)
+        .sort(
+          (first, second) =>
+            first.distanceMeters - second.distanceMeters,
+        );
       response.json({
         items,
         count: items.length,
@@ -173,7 +178,12 @@ export function createApiRouter(amapClient: AmapClient): Router {
       }
 
       const raw = await amapClient.searchServiceAreas(parsed.data);
-      const items = normalizeServiceAreas(raw);
+      const items = normalizeServiceAreas(raw, parsed.data)
+        .filter((area) => area.distanceMeters <= parsed.data.radius)
+        .sort(
+          (first, second) =>
+            first.distanceMeters - second.distanceMeters,
+        );
       response.json({ items, count: items.length });
     }),
   );

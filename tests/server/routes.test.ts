@@ -74,7 +74,7 @@ describe("API routes", () => {
     const response = await request(
       createApp({ amapClient: fakeAmapClient() }),
     ).get(
-      "/api/charging-stations?lng=116.39&lat=39.90&radius=10000",
+      "/api/charging-stations?lng=116.2468&lat=40.1659&radius=10000",
     );
 
     expect(response.status).toBe(200);
@@ -83,8 +83,53 @@ describe("API routes", () => {
     expect(response.body.items[0]).toMatchObject({
       id: "B0FFTEST01",
       name: "京藏高速百葛服务区充电站",
+      distanceMeters: 0,
     });
     expect(JSON.stringify(response.body)).not.toContain("server-only-key");
+  });
+
+  it("calculates and filters nearby distance locally instead of trusting AMap", async () => {
+    const amapClient = fakeAmapClient({
+      searchChargingStations: async () => ({
+        status: "1",
+        info: "OK",
+        infocode: "10000",
+        count: "2",
+        pois: [
+          {
+            ...chargingPoi(
+              "nearby",
+              "本地距离内充电站",
+              "011100",
+              "汽车服务;充电站;充电站",
+            ),
+            location: "116.400100,39.900000",
+            distance: "999999",
+          },
+          {
+            ...chargingPoi(
+              "outside",
+              "本地距离外充电站",
+              "011100",
+              "汽车服务;充电站;充电站",
+            ),
+            location: "116.450000,39.900000",
+            distance: "1",
+          },
+        ],
+      }),
+    });
+
+    const response = await request(createApp({ amapClient })).get(
+      "/api/charging-stations?lng=116.4&lat=39.9&radius=3000",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.items[0]).toMatchObject({
+      id: "nearby",
+      distanceMeters: 9,
+    });
   });
 
   it("keeps only automotive charging and swapping POI categories", async () => {
@@ -336,16 +381,52 @@ describe("API routes", () => {
     );
   });
 
-  it("returns normalized service areas and road context", async () => {
-    const app = createApp({ amapClient: fakeAmapClient() });
+  it("calculates, sorts, and filters service-area distance locally", async () => {
+    const amapClient = fakeAmapClient({
+      searchServiceAreas: async () => ({
+        status: "1",
+        info: "OK",
+        infocode: "10000",
+        count: "3",
+        pois: [
+          {
+            id: "farther",
+            name: "范围内较远服务区",
+            location: "116.410000,39.900000",
+            distance: "1",
+            address: "测试高速",
+          },
+          {
+            id: "nearest",
+            name: "范围内最近服务区",
+            location: "116.400100,39.900000",
+            distance: "999999",
+            address: "测试高速",
+          },
+          {
+            id: "outside",
+            name: "范围外服务区",
+            location: "116.450000,39.900000",
+            distance: "2",
+            address: "测试高速",
+          },
+        ],
+      }),
+    });
+    const app = createApp({ amapClient });
     const serviceAreas = await request(app).get(
-      "/api/service-areas?lng=116.39&lat=39.90&radius=50000",
+      "/api/service-areas?lng=116.4&lat=39.9&radius=3000",
     );
     const roadContext = await request(app).get(
       "/api/road-context?lng=116.39&lat=39.90",
     );
 
-    expect(serviceAreas.body.items[0].id).toBe("B0FFAREA01");
+    expect(serviceAreas.status).toBe(200);
+    expect(serviceAreas.body.items).toHaveLength(2);
+    expect(serviceAreas.body.items).toEqual([
+      expect.objectContaining({ id: "nearest", distanceMeters: 9 }),
+      expect.objectContaining({ id: "farther", distanceMeters: 853 }),
+    ]);
     expect(roadContext.body).toEqual({
       formattedAddress: "北京市昌平区京藏高速",
       nearestRoad: "京藏高速",
