@@ -234,6 +234,38 @@ test("the selected viewport has no horizontal page overflow", async ({
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+test("wide web layout places the station list to the left of the radar", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "car-display",
+    "The side-by-side layout only applies to wide web viewports",
+  );
+  await mockApi(page);
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "城市公共充电站" }),
+  ).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const results = document
+      .querySelector(".results-panel")
+      ?.getBoundingClientRect();
+    const radar = document
+      .querySelector(".radar-panel")
+      ?.getBoundingClientRect();
+    return {
+      resultsLeft: results?.left ?? 0,
+      resultsTop: results?.top ?? 0,
+      radarLeft: radar?.left ?? 0,
+      radarTop: radar?.top ?? 0,
+    };
+  });
+
+  expect(layout.resultsLeft).toBeLessThan(layout.radarLeft);
+  expect(Math.abs(layout.resultsTop - layout.radarTop)).toBeLessThanOrEqual(1);
+});
+
 test("the four driving status blocks stay on one compact row", async ({
   page,
 }) => {
