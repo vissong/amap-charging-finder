@@ -266,24 +266,38 @@ test("wide web layout places the station list to the left of the radar", async (
   expect(Math.abs(layout.resultsTop - layout.radarTop)).toBeLessThanOrEqual(1);
 });
 
-test("the four driving status blocks stay on one compact row", async ({
+test("the two primary driving metrics stay readable on one row", async ({
   page,
-}) => {
+}, testInfo) => {
   await mockApi(page);
   await page.goto("/");
 
   const statusCells = page.locator(".status-bar .status-cell");
-  await expect(statusCells).toHaveCount(4);
+  await expect(statusCells).toHaveCount(2);
 
   const metrics = await statusCells.evaluateAll((cells) => {
     const boxes = cells.map((cell) => cell.getBoundingClientRect());
     const bar = cells[0]?.parentElement?.getBoundingClientRect();
+    const speed = document.querySelector(".status-cell--speed > strong");
+    const direction = document.querySelector(
+      ".status-cell--direction > strong",
+    );
     return {
       tops: boxes.map((box) => Math.round(box.top)),
       barHeight: bar?.height ?? 0,
+      speedFontSize: speed
+        ? Number.parseFloat(getComputedStyle(speed).fontSize)
+        : 0,
+      directionFontSize: direction
+        ? Number.parseFloat(getComputedStyle(direction).fontSize)
+        : 0,
     };
   });
 
   expect(new Set(metrics.tops).size).toBe(1);
   expect(metrics.barHeight).toBeLessThanOrEqual(80);
+  if (testInfo.project.name === "car-display") {
+    expect(metrics.speedFontSize).toBeGreaterThanOrEqual(28);
+    expect(metrics.directionFontSize).toBeGreaterThanOrEqual(24);
+  }
 });

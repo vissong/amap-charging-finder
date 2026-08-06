@@ -149,7 +149,7 @@ describe("App", () => {
     expect(
       screen.getByRole("img", { name: "充电站相对位置雷达" }),
     ).toBeVisible();
-    expect(screen.getByText("望京路")).toBeVisible();
+    expect(screen.getByText("望京路 · 当前静止")).toBeVisible();
     expect(screen.getByText("前电")).toBeVisible();
     expect(screen.queryByText("公开 POI")).not.toBeInTheDocument();
     expect(

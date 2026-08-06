@@ -1,8 +1,8 @@
 import {
   Compass,
-  Gauge,
   LocateFixed,
-  Route,
+  LoaderCircle,
+  MapPinOff,
 } from "lucide-react";
 
 import type {
@@ -65,38 +65,48 @@ export function StatusBar({
       ? "—"
       : Math.round(motion.speedMps * 3.6).toString();
   const road = roadContext?.nearestRoad ?? "等待道路";
+  const LocationIcon =
+    trackerStatus === "ready"
+      ? LocateFixed
+      : trackerStatus === "locating"
+        ? LoaderCircle
+        : MapPinOff;
+  const accuracy =
+    accuracyMeters === null
+      ? "等待定位精度"
+      : `定位精度 ±${Math.round(accuracyMeters)} m`;
+  const phase = motion.phase === "moving" ? "行进中" : "当前静止";
 
   return (
     <section className="status-bar" aria-label="行驶状态">
-      <div className="status-cell">
-        <LocateFixed aria-hidden="true" size={18} />
-        <span>定位</span>
-        <strong>{trackerLabels[trackerStatus]}</strong>
-        <small>
-          {accuracyMeters === null
-            ? "等待精度"
-            : `±${Math.round(accuracyMeters)} m`}
-        </small>
-      </div>
       <div className="status-cell status-cell--speed">
-        <Gauge aria-hidden="true" size={18} />
-        <span>速度</span>
-        <strong>{speed}</strong>
-        <small>km/h</small>
-      </div>
-      <div className="status-cell">
-        <Route aria-hidden="true" size={18} />
-        <span>道路</span>
-        <strong>{road}</strong>
-        <small>{roadContext?.formattedAddress ?? "精确定位后识别"}</small>
+        <div className="status-cell__lead">
+          <span
+            className="status-locator"
+            data-status={trackerStatus}
+            role="img"
+            aria-label={`定位状态：${trackerLabels[trackerStatus]}`}
+            title={trackerLabels[trackerStatus]}
+          >
+            <LocationIcon aria-hidden="true" size={20} />
+          </span>
+          <span>实时速度</span>
+        </div>
+        <strong>
+          <span>{speed}</span>
+          <em>km/h</em>
+        </strong>
+        <small>{accuracy}</small>
       </div>
       <div
-        className={`status-cell status-cell--scene scene-${highwayState}`}
+        className={`status-cell status-cell--direction scene-${highwayState}`}
       >
-        <Compass aria-hidden="true" size={18} />
-        <span>方向 · {highwayLabels[highwayState]}</span>
+        <div className="status-cell__lead">
+          <Compass aria-hidden="true" size={20} />
+          <span>方向 · {highwayLabels[highwayState]}</span>
+        </div>
         <strong>{headingLabel(motion.heading)}</strong>
-        <small>{motion.phase === "moving" ? "行进中" : "当前静止"}</small>
+        <small>{road} · {phase}</small>
       </div>
     </section>
   );
