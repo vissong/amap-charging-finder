@@ -26,9 +26,14 @@ describe("StatusBar", () => {
       />,
     );
 
+    expect(document.querySelectorAll(".status-cell")).toHaveLength(2);
+    expect(
+      screen.getByRole("img", { name: "定位状态：定位正常" }),
+    ).toBeVisible();
+    expect(screen.queryByText("定位正常")).not.toBeInTheDocument();
     expect(screen.getByText("36")).toBeVisible();
     expect(screen.getByText("东北 45°")).toBeVisible();
     expect(screen.getByText("方向 · 普通道路")).toBeVisible();
-    expect(screen.getByText("行进中")).toBeVisible();
+    expect(screen.getByText("测试路 · 行进中")).toBeVisible();
   });
 });
