@@ -99,6 +99,7 @@ function isAutomotiveChargingPoi(
 
 export function normalizeChargingStations(
   response: unknown,
+  referenceLocation?: Coordinates,
 ): ChargingStation[] {
   return pois(response).flatMap((candidate) => {
     const source = record(candidate);
@@ -119,7 +120,9 @@ export function normalizeChargingStations(
         parentId: text(source.parent),
         name,
         location,
-        distanceMeters: numeric(source.distance) ?? 0,
+        distanceMeters: referenceLocation
+          ? Math.round(haversineMeters(referenceLocation, location))
+          : 0,
         type: text(source.type),
         typecode: text(source.typecode),
         address: text(source.address),
@@ -210,7 +213,10 @@ export function normalizeServiceAreaChargingStations(
     );
 }
 
-export function normalizeServiceAreas(response: unknown): ServiceArea[] {
+export function normalizeServiceAreas(
+  response: unknown,
+  referenceLocation?: Coordinates,
+): ServiceArea[] {
   return pois(response).flatMap((candidate) => {
     const source = record(candidate);
     const id = text(source?.id);
@@ -223,7 +229,9 @@ export function normalizeServiceAreas(response: unknown): ServiceArea[] {
         id,
         name,
         location,
-        distanceMeters: numeric(source.distance) ?? 0,
+        distanceMeters: referenceLocation
+          ? Math.round(haversineMeters(referenceLocation, location))
+          : 0,
         address: text(source.address),
       },
     ];

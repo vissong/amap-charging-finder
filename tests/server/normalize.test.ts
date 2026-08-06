@@ -14,7 +14,10 @@ import {
 
 describe("AMap response normalization", () => {
   it("normalizes actual POI fields and rejects invalid records", () => {
-    const stations = normalizeChargingStations(fullAmapPoiResponse);
+    const stations = normalizeChargingStations(fullAmapPoiResponse, {
+      lng: 116.2468,
+      lat: 40.1659,
+    });
 
     expect(stations).toHaveLength(1);
     expect(stations[0]).toEqual({
@@ -22,7 +25,7 @@ describe("AMap response normalization", () => {
       parentId: "B0FFAREA01",
       name: "京藏高速百葛服务区充电站",
       location: { lng: 116.2468, lat: 40.1659 },
-      distanceMeters: 850,
+      distanceMeters: 0,
       type: "汽车服务;充电站;充电站",
       typecode: "011100",
       address: "京藏高速百葛服务区东区",
@@ -66,12 +69,17 @@ describe("AMap response normalization", () => {
   });
 
   it("normalizes service areas without charging-only details", () => {
-    expect(normalizeServiceAreas(amapServiceAreaResponse)).toEqual([
+    expect(
+      normalizeServiceAreas(amapServiceAreaResponse, {
+        lng: 116.247,
+        lat: 40.166,
+      }),
+    ).toEqual([
       {
         id: "B0FFAREA01",
         name: "百葛服务区",
         location: { lng: 116.247, lat: 40.166 },
-        distanceMeters: 900,
+        distanceMeters: 0,
         address: "京藏高速",
       },
     ]);
