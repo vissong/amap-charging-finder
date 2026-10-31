@@ -100,10 +100,8 @@ describe("useDriveTracker", () => {
     expect(result.current.status).toBe("ready");
     expect(result.current.motion.phase).toBe("moving");
     expect(result.current.motion.heading).toBeCloseTo(2.5, 0);
-    expect(result.current.latest?.location).toEqual({
-      lng: 116.401,
-      lat: 39.9,
-    });
+    expect(result.current.latest?.location.lng).toBeCloseTo(116.4072, 3);
+    expect(result.current.latest?.location.lat).toBeCloseTo(39.9014, 3);
   });
 
   it("exposes permission denial as a recoverable state", () => {

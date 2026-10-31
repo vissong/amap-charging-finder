@@ -6,6 +6,7 @@ import {
   type MotionSnapshot,
   type PositionSample,
 } from "../../shared/motion";
+import { wgs84ToGcj02 } from "../../shared/geo";
 
 export type DriveTrackerStatus =
   | "locating"
@@ -24,12 +25,14 @@ export interface DriveTrackerState {
 }
 
 function toSample(position: GeolocationPosition): PositionSample {
+  const location = wgs84ToGcj02({
+    lng: position.coords.longitude,
+    lat: position.coords.latitude,
+  });
+
   return {
     timestamp: position.timestamp,
-    location: {
-      lng: position.coords.longitude,
-      lat: position.coords.latitude,
-    },
+    location,
     accuracyMeters: position.coords.accuracy,
     speedMps:
       position.coords.speed !== null && position.coords.speed >= 0

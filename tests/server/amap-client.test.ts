@@ -1,7 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { createAmapClient } from "../../server/amap-client";
+import {
+  createAmapClient,
+  type CreateAmapClientOptions,
+} from "../../server/amap-client";
+import {
+  createRequestRateLimiter,
+  RequestRateLimitError,
+  type RequestRateLimiter,
+} from "../../server/request-rate-limiter";
 import { fullAmapPoiResponse } from "../fixtures/amap";
+
+const immediateRateLimiter: RequestRateLimiter = {
+  schedule: (request) => request(),
+  coolDown: () => {},
+};
+
+function createTestAmapClient(
+  options: Omit<CreateAmapClientOptions, "requestRateLimiter">,
+) {
+  return createAmapClient({
+    ...options,
+    requestRateLimiter: immediateRateLimiter,
+  });
+}
 
 function poiPage(pageNumber: number, count: number) {
   return {
@@ -30,7 +52,7 @@ describe("AMap HTTP client", () => {
         headers: { "content-type": "application/json" },
       });
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
     });
@@ -70,7 +92,7 @@ describe("AMap HTTP client", () => {
         }),
       );
     };
-    const client = createAmapClient({ key: "server-only-key", fetchImpl });
+    const client = createTestAmapClient({ key: "server-only-key", fetchImpl });
 
     await client.searchServiceAreas({
       lng: 116.4,
@@ -96,10 +118,9 @@ describe("AMap HTTP client", () => {
         { status: 200 },
       );
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
-      sleepImpl: async () => {},
     });
 
     const response = (await client.searchChargingStations({
@@ -126,10 +147,9 @@ describe("AMap HTTP client", () => {
         { status: 200 },
       );
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
-      sleepImpl: async () => {},
     });
 
     const response = (await client.searchChargingStations({
@@ -166,10 +186,9 @@ describe("AMap HTTP client", () => {
         { status: 200 },
       );
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
-      sleepImpl: async () => {},
     });
 
     const response = (await client.searchChargingStations({
@@ -185,7 +204,6 @@ describe("AMap HTTP client", () => {
 
   it("backs off once and recovers a rate-limited nearby page", async () => {
     const requestedPages: number[] = [];
-    const sleepDurations: number[] = [];
     let pageTwoAttempts = 0;
     const fetchImpl: typeof fetch = async (input) => {
       const pageNumber = Number(
@@ -207,12 +225,9 @@ describe("AMap HTTP client", () => {
         { status: 200 },
       );
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
-      sleepImpl: async (milliseconds) => {
-        sleepDurations.push(milliseconds);
-      },
     });
 
     const response = (await client.searchChargingStations({
@@ -222,7 +237,6 @@ describe("AMap HTTP client", () => {
     })) as { pois: unknown[]; truncated: boolean };
 
     expect(requestedPages).toEqual([1, 2, 2]);
-    expect(sleepDurations).toEqual([400, 1_000]);
     expect(response.pois).toHaveLength(27);
     expect(response.truncated).toBe(false);
   });
@@ -236,7 +250,7 @@ describe("AMap HTTP client", () => {
         headers: { "content-type": "application/json" },
       });
     };
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
     });
@@ -295,13 +309,9 @@ describe("AMap HTTP client", () => {
         }),
       );
     };
-    const sleepDurations: number[] = [];
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl,
-      sleepImpl: async (milliseconds) => {
-        sleepDurations.push(milliseconds);
-      },
     });
 
     const response = (await client.searchServiceAreaChargingStations(
@@ -324,12 +334,11 @@ describe("AMap HTTP client", () => {
       "125.322855,41.234724",
     );
     expect(requestedUrls[2].searchParams.get("keywords")).toBe("交投");
-    expect(sleepDurations).toEqual([400]);
     expect(response.tips).toHaveLength(2);
   });
 
   it("rejects a successful HTTP response with an AMap failure status", async () => {
-    const client = createAmapClient({
+    const client = createTestAmapClient({
       key: "server-only-key",
       fetchImpl: async () =>
         new Response(
@@ -347,5 +356,186 @@ describe("AMap HTTP client", () => {
       name: "AmapUpstreamError",
       infocode: "10003",
     });
+  });
+
+  it("routes every AMap endpoint through one shared limiter", async () => {
+    let scheduled = 0;
+    const requestRateLimiter: RequestRateLimiter = {
+      async schedule(request) {
+        scheduled += 1;
+        return request();
+      },
+      coolDown: () => {},
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      requestRateLimiter,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            status: "1",
+            info: "OK",
+            infocode: "10000",
+            count: "0",
+            pois: [],
+          }),
+        ),
+    });
+
+    await Promise.all([
+      client.searchChargingStationsByKeyword("充电站"),
+      client.searchServiceAreas({ lng: 116.4, lat: 39.9, radius: 3_000 }),
+      client.reverseGeocode({ lng: 116.4, lat: 39.9 }),
+    ]);
+
+    expect(scheduled).toBe(3);
+  });
+
+  it("backs off and retries a rate-limited keyword request once", async () => {
+    let attempts = 0;
+    const cooldowns: number[] = [];
+    const requestRateLimiter: RequestRateLimiter = {
+      schedule: (request) => request(),
+      coolDown(milliseconds) {
+        cooldowns.push(milliseconds);
+      },
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      requestRateLimiter,
+      fetchImpl: async () => {
+        attempts += 1;
+        return new Response(
+          JSON.stringify(
+            attempts === 1
+              ? {
+                  status: "0",
+                  info: "CKQPS_HAS_EXCEEDED_THE_LIMIT",
+                  infocode: "10020",
+                }
+              : {
+                  status: "1",
+                  info: "OK",
+                  infocode: "10000",
+                  count: "0",
+                  pois: [],
+                },
+          ),
+        );
+      },
+    });
+
+    await client.searchChargingStationsByKeyword("充电站");
+
+    expect(attempts).toBe(2);
+    expect(cooldowns).toEqual([1_000]);
+  });
+
+  it("shares one limiter across multiple AMap client instances", async () => {
+    let now = 0;
+    const starts: number[] = [];
+    const requestRateLimiter = createRequestRateLimiter({
+      maxQps: 3,
+      now: () => now,
+      wait: async (milliseconds) => {
+        now += milliseconds;
+      },
+    });
+    const options = {
+      key: "server-only-key",
+      requestRateLimiter,
+      fetchImpl: async () => {
+        starts.push(now);
+        return new Response(
+          JSON.stringify({ status: "1", info: "OK", infocode: "10000" }),
+        );
+      },
+    };
+    const firstClient = createAmapClient(options);
+    const secondClient = createAmapClient(options);
+
+    await Promise.all([
+      firstClient.reverseGeocode({ lng: 116.4, lat: 39.9 }),
+      secondClient.reverseGeocode({ lng: 116.4, lat: 39.9 }),
+    ]);
+
+    expect(starts).toEqual([0, 334]);
+  });
+
+  it("does not start an upstream request after its client signal aborts", async () => {
+    let fetches = 0;
+    const controller = new AbortController();
+    const client = createAmapClient({
+      key: "server-only-key",
+      requestRateLimiter: createRequestRateLimiter({ maxQps: 3 }),
+      fetchImpl: async () => {
+        fetches += 1;
+        return new Response(
+          JSON.stringify({ status: "1", info: "OK", infocode: "10000" }),
+        );
+      },
+    });
+    controller.abort();
+
+    await expect(
+      client.reverseGeocode(
+        { lng: 116.4, lat: 39.9 },
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({
+      name: "RequestRateLimitError",
+      code: "ABORTED",
+    });
+    expect(fetches).toBe(0);
+  });
+
+  it("preserves local queue saturation errors for the HTTP layer", async () => {
+    const requestRateLimiter: RequestRateLimiter = {
+      schedule: async () => {
+        throw new RequestRateLimitError(
+          "QUEUE_FULL",
+          "AMap request queue is full",
+        );
+      },
+      coolDown: () => {},
+    };
+    const client = createAmapClient({
+      key: "server-only-key",
+      requestRateLimiter,
+    });
+
+    await expect(
+      client.reverseGeocode({ lng: 116.4, lat: 39.9 }),
+    ).rejects.toMatchObject({
+      name: "RequestRateLimitError",
+      code: "QUEUE_FULL",
+    });
+  });
+
+  it("does not turn an aborted pagination request into a partial success", async () => {
+    let fetches = 0;
+    const controller = new AbortController();
+    const client = createAmapClient({
+      key: "server-only-key",
+      requestRateLimiter: createRequestRateLimiter({ maxQps: 3 }),
+      fetchImpl: async () => {
+        fetches += 1;
+        queueMicrotask(() => controller.abort());
+        return new Response(
+          JSON.stringify({ ...poiPage(1, 25), count: "50" }),
+        );
+      },
+    });
+
+    await expect(
+      client.searchChargingStations(
+        { lng: 116.4, lat: 39.9, radius: 3_000 },
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({
+      name: "RequestRateLimitError",
+      code: "ABORTED",
+    });
+    expect(fetches).toBe(1);
   });
 });

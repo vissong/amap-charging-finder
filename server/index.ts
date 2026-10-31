@@ -6,10 +6,17 @@ import { createAmapClient } from "./amap-client";
 import { createApp } from "./app";
 import { getServerConfig } from "./config";
 import { serveProductionFrontend } from "./frontend";
+import { createRequestRateLimiter } from "./request-rate-limiter";
 
 async function main(): Promise<void> {
   const config = getServerConfig();
-  const amapClient = createAmapClient({ key: config.amapWebServiceKey });
+  const requestRateLimiter = createRequestRateLimiter({
+    maxQps: config.amapMaxQps,
+  });
+  const amapClient = createAmapClient({
+    key: config.amapWebServiceKey,
+    requestRateLimiter,
+  });
   const app = createApp({ amapClient });
 
   if (process.env.NODE_ENV === "production") {
